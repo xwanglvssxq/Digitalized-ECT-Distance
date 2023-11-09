@@ -59,7 +59,7 @@ class Shape:
                 v1=p1-p0
                 v2=p2-p0
                 res=np.cross(v1,v2)
-                press=res/(sum(res**2))
+                press=res/(sum(res**2))**(1/2)
                 coords[i,:]=press
             self.polygon_angles[key]=np.concatenate((coords,-coords))
 
