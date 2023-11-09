@@ -17,6 +17,12 @@ class Shape:
         self.detecting_polygons={}
         self.polygon_gains={}
         
+        # November 9 2023: Add helper dictionary for edges
+        # The format of this will be as follows:
+        # For vertex i,  dictionary listing all the triple points.
+        # Note: these are in the same order as the self.polygon_angles
+        self.sphere_point_names={}
+        
     def center_n_scale(self):
         '''
         Not needed for now
@@ -50,6 +56,7 @@ class Shape:
             n=len(self.links[key])
             trick=np.array(list(combinations(self.links[key],2)))
             coords=np.empty((trick.shape[0],3))
+            pointnames=np.empty((trick.shape[0],2)) # Contains the names for the point
             # For each vertex p0=(x0,y0), go through the neighbors p=(x,y)
             for i in range(trick.shape[0]):
                 neighbor1=trick[i,0].astype(int)
@@ -61,7 +68,9 @@ class Shape:
                 res=np.cross(v1,v2)
                 press=res/(sum(res**2))**(1/2)
                 coords[i,:]=press
+                pointnames[i,:]=[neighbor1,neighbor2]
             self.polygon_angles[key]=np.concatenate((coords,-coords))
+            self.sphere_point_names[key]=np.concatenate((pointnames,pointnames))
 
     def compute_delaunay_triangles(self):
         '''
