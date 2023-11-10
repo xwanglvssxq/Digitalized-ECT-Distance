@@ -3,6 +3,7 @@ import math
 #import ect_utils
 from itertools import combinations
 from scipy.spatial import Delaunay
+
 class Shape:
     # params: self, Vertices, Edges, Triangles
     def __init__(self, vertices, triangles,name=None):
@@ -85,9 +86,20 @@ class Shape:
             t1=t1.reshape(1,-1)
             t2=np.concatenate([test,t1])
             D2=Delaunay(t2)
+            print(D2.simplices)
             telek=D2.simplices
             D1=telek[:,1:4]
-            D1=D1-1 # Stupid index thingy
+            #import pdb; pdb.set_trace()
+            for i in range(telek.shape[0]):
+                row=telek[i,:]
+                index=np.where(row==np.max(row))
+                newrow=np.delete(row,index)
+                #import pdb; pdb.set_trace()
+                #if index[0][0]%2==1:
+                #    newrow=[newrow[1],newrow[0],newrow[2]]
+                D1[i,:]=newrow
+#            print(D2.simplices)
+            #D1=D1-1 # Stupid index thingy
             midpoints=np.zeros(D1.shape)
             for i in range(D1.shape[0]):
                 tmp=np.mean(test[D1[i]],1)
