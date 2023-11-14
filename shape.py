@@ -17,7 +17,9 @@ class Shape:
         self.vertex_edges={}
         self.detecting_polygons={}
         self.polygon_gains={}
-        
+        # Nov 14 add
+        self.clean_polygon_triangles={}
+        self.clean_polygon_gains={}
         # November 9 2023: Add helper dictionary for edges
         # The format of this will be as follows:
         # For vertex i,  dictionary listing all the triple points.
@@ -86,8 +88,9 @@ class Shape:
             t1=t1.reshape(1,-1)
             t2=np.concatenate([test,t1])
             D2=Delaunay(t2)
-            print(D2.simplices)
+            #print(D2.simplices)
             telek=D2.simplices
+            # post processing here
             D1=telek[:,1:4]
             #import pdb; pdb.set_trace()
             for i in range(telek.shape[0]):
@@ -143,7 +146,11 @@ class Shape:
         
     def compute_transform(self):
         pass
-
+    def clean_triangles(self):
+        for key in self.polygon_triangles:
+            tmp=np.where(self.polygon_gains[key]!=0)[0]
+            self.clean_polygon_triangles[key]=self.polygon_triangles[key][tmp,:]
+            self.clean_polygon_gains[key]=self.polygon_gains[key][tmp]
     def prepare(self):
         '''
         This helper function speedens up the combinatorial ECT evaluation algorithm
