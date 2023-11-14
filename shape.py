@@ -91,23 +91,26 @@ class Shape:
             #print(D2.simplices)
             telek=D2.simplices
             # post processing here
-            D1=telek[:,1:4]
+            D1=np.zeros(telek[:,1:4].shape,dtype=int)
+            #print(D2.simplices)
             #import pdb; pdb.set_trace()
             for i in range(telek.shape[0]):
                 row=telek[i,:]
-                index=np.where(row==np.max(row))
-                newrow=np.delete(row,index)
+                index=np.where(row==np.max(row)) #the old way
+                newrow=np.delete(row,index) #the old way
+                #newrow=np.setdiff1d(row,np.max(row))
                 #import pdb; pdb.set_trace()
                 #if index[0][0]%2==1:
                 #    newrow=[newrow[1],newrow[0],newrow[2]]
                 D1[i,:]=newrow
-#            print(D2.simplices)
+            #print(D1)#2.simplices)
             #D1=D1-1 # Stupid index thingy
             midpoints=np.zeros(D1.shape)
             for i in range(D1.shape[0]):
                 tmp=np.mean(test[D1[i]],1)
                 midpoints[i]=tmp/(sum(tmp**2))**(0.5)
             self.polygon_triangles[key]=D1
+            #print(self.polygon_triangles[key])
             self.polygon_midpoints[key]=midpoints
 
     def compute_gains(self):
@@ -144,6 +147,26 @@ class Shape:
         +sum([set(subset1).issuperset(row) for row in edges.tolist()])
         return(chi)
         
+    def evaluate_local_ECT2(self,direction, vertex):
+        '''
+        Helper function for finding the spherical triangles that matter.
+        This is the combinatorial algorithm! TODO: Find if the geometric one is faster
+        Also, currently this uses all of the vertices. Would it be sufficient to just use the link?
+        '''
+        dir_vector=direction
+        heights=np.matmul(dir_vector,self.V.T)
+        order=np.argsort(heights)
+        cutpoint=np.where(order==vertex)[0][0]
+        subset1=order[:cutpoint]
+        subset2=order[:(cutpoint+1)]
+        faces=self.vertex_faces[vertex]
+        edges=self.vertex_edges[vertex]
+        # Change in ECT: 1 (p0) -edges + triangles
+        chi=1+sum([set(subset2).issuperset(row) for row in faces.tolist()]) \
+        -sum([set(subset1).issuperset(row) for row in faces.tolist()]) \
+        -sum([set(subset2).issuperset(row) for row in edges.tolist()]) \
+        +sum([set(subset1).issuperset(row) for row in edges.tolist()])
+        return(chi)        
     def compute_transform(self):
         pass
     def clean_triangles(self):
@@ -173,6 +196,9 @@ class Shape:
                 edges[3*j+1,:]=[v2,v3]
                 edges[3*j+2,:]=[v4,v5]
             edges=np.unique(edges,axis=0)
+            ind1=edges[:,0]==i
+            ind2=edges[:,1]==i
+            edges=edges[np.where(np.any([ind1,ind2],0)),:][0]
             verts=np.unique(edges,0)
             self.vertex_faces[i]=faces
             self.vertex_edges[i]=edges
