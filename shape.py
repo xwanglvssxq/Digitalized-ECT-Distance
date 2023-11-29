@@ -3,6 +3,7 @@ import math
 #import ect_utils
 from itertools import combinations
 from scipy.spatial import Delaunay
+import itertools
 
 class Shape:
     # params: self, Vertices, Edges, Triangles
@@ -90,6 +91,7 @@ class Shape:
             D2=Delaunay(t2)
             #print(D2.simplices)
             telek=D2.simplices
+            print(telek)
             # post processing here
             D1=np.zeros(telek[:,1:4].shape,dtype=int)
             #print(D2.simplices)
@@ -107,11 +109,184 @@ class Shape:
             #D1=D1-1 # Stupid index thingy
             midpoints=np.zeros(D1.shape)
             for i in range(D1.shape[0]):
-                tmp=np.mean(test[D1[i]],1)
+                tmp=np.mean(test[D1[i]],0)
                 midpoints[i]=tmp/(sum(tmp**2))**(0.5)
+            #D1=np.unique(D1,axis=0)
             self.polygon_triangles[key]=D1
             #print(self.polygon_triangles[key])
             self.polygon_midpoints[key]=midpoints
+
+    def compute_TP_DT_vol2(self): # New Nov 23
+        for key in self.links:
+            edges,verts=self.compute_triangluation(key)
+            self.polygon_angles[key]=verts
+            tmp,_=self.construct_fan_triangulation(edges)
+            tmp_T=self.construct_triangles_from_fans(tmp)
+            midpoints=np.zeros(tmp_T.shape)
+            for i in range(tmp_T.shape[0]):
+                #import pdb; pdb.set_trace()
+                tmp=np.mean(verts[tmp_T[i].astype(int)],0)
+                midpoints[i]=tmp/(sum(tmp**2))**(0.5)
+            self.polygon_triangles[key]=tmp_T.astype(int)
+            self.polygon_midpoints[key]=midpoints
+
+    def compute_TP_DT_vol3(self): # New Nov 23
+        for key in self.links:
+            edges,verts=self.compute_triangluation(key)
+            self.polygon_angles[key]=verts
+            tmp,I=self.construct_fan_triangulation(edges)
+            tmp_T=self.construct_triangulation(I,edges)
+            midpoints=np.zeros(tmp_T.shape)
+            for i in range(tmp_T.shape[0]):
+                #import pdb; pdb.set_trace()
+                tmp=np.mean(verts[tmp_T[i].astype(int)],0)
+                midpoints[i]=tmp/(sum(tmp**2))**(0.5)
+            self.polygon_triangles[key]=tmp_T.astype(int)
+            self.polygon_midpoints[key]=midpoints
+
+    def construct_fan_triangulation(self,edges):  # New Nov 23
+        '''
+        Given edges describing polygons (collection of cycles), returns a fan triangulation
+        so that each vertex in a cycle is connected to the root of that cycle
+        '''
+        tmpmatrix=np.zeros([len(edges),len(edges)])
+        for i in range(len(edges)): # Construct the adjacency matrix
+            tmpmatrix[i,:]=[len(set.intersection(set(edge),set(edges[i])))==1 for edge in edges]
+        sum_matrix=np.zeros([len(edges),len(edges)])
+        for i in range(len(edges)): # Find H_0 with Perron-Frobenius Theorem
+            sum_matrix=sum_matrix+np.linalg.matrix_power(tmpmatrix,(i+1))
+        Imatrix=(sum_matrix>0).astype(int)
+        dist=np.unique(Imatrix,axis=0)
+        for i in range(dist.shape[0]):
+            #print('paska')
+            tmp=Imatrix==dist[i] # Here: This needs to be fixed
+            ind=np.mean(tmp,1).astype(int)
+            inds=np.where(ind==1)
+            ind1=inds[0][0]
+            #print(inds)
+            #print(len(inds[0]))
+            for j in range(1,len(inds[0])):
+                #print(tmpmatrix)
+                #print(ind1)
+                #print(inds)
+                tmpmatrix[ind1,inds[0][j]]=1
+                tmpmatrix[inds[0][j],ind1]=1
+        return(tmpmatrix,Imatrix)
+
+    def unique_list(a_list: list) -> list:
+        """
+        A helper file for topological regularizer
+        Given a list a_list,
+        returns the unique elements in that.
+        Used for computing the connections
+        when building the linear surrogate function
+        Args:
+             a_list:
+                 a list
+        Returns
+            uniquelist:
+                a list of unique entries of the list a_list
+        """
+        uniquelist = []
+        used = set()
+        for item in a_list:
+            tmp = repr(item)
+            if tmp not in used:
+                used.add(tmp)
+                uniquelist.append(item)
+        return uniquelist
+
+    def construct_triangulation(self,I,e):
+        dist=np.unique(I,axis=0)
+        triangles=[]
+        for i in range(dist.shape[0]):
+            row=dist[i]
+            #print(i)
+            #print(row)
+            inds=np.where(np.mean(I==row,1)==1)[0]
+            tmpedges=[e[ind] for ind in inds]
+            trick=np.unique(tmpedges)
+            main=trick[0]
+            inds2=np.where([len(set.intersection(set([main]),set(edge)))==0 for edge in tmpedges])[0]
+            for j in range(len(inds2)):
+                triangles.append([main,*tmpedges[inds2[j]]])
+        return(np.array(triangles))
+
+    def construct_triangles_from_fans(self,matrix):  # New Nov 23
+        '''
+        Given a fan triangulation matrix, returns the triangles
+        '''
+        inds=[sum(row)==3 for row in matrix]
+        triangles=np.zeros([sum(inds),3])
+        for i in range(triangles.shape[0]):
+            row=matrix[np.where(inds)[0][i],:]
+            #print(row)
+            #print(np.where(row))
+            triangles[i,:]=np.where(row)[0]
+        return(triangles)
+    
+    def compute_face_normal(self,triangle):  # New Nov 23
+        x1=triangle[0,:]
+        x2=triangle[1,:]
+        x3=triangle[2,:]
+        tmp=np.cross(x2-x1,x3-x1)
+        return(tmp/sum(tmp**2)**(0.5))
+        
+    def dualize_link(self,key):  # New Nov 23
+        '''
+        Returns the dual graph
+        '''
+        edges=[]
+        triangles=self.vertex_faces[key]
+        for i in range(triangles.shape[0]):
+            t1=triangles[i,:]
+            for j in range(i):
+                t2=triangles[j,:]
+                if(len(set.intersection(set(t1),set(t2)))==2):
+                    edges.append([i,j])
+        return(np.array(edges))
+        
+    def compute_triangluation(self,key):
+        triangles=self.vertex_faces[key]
+        tmp_verts=np.zeros(triangles.shape)
+        for i in range(triangles.shape[0]):
+            triangle=triangles[i,:]
+            n1=self.compute_face_normal(self.V[triangle.astype(int),:])
+            #print(n1)
+            tmp_verts[i,:]=n1
+        verts=np.concatenate([tmp_verts,-tmp_verts])
+        tmp_edges=self.dualize_link(key)
+        #print(verts)
+        edges=[]
+        for i in range(tmp_edges.shape[0]):
+            ind0=tmp_edges[i,0]
+            ind1=tmp_edges[i,1]
+            ind2=ind0+triangles.shape[0]
+            ind3=ind1+triangles.shape[0]
+            #print(verts[ind0,:])
+            trick0=2*(np.dot(verts[ind0,:],self.V[key,:])>0)-1
+            trick1=2*(np.dot(verts[ind1,:],self.V[key,:])>0)-1
+            trick2=2*(np.dot(verts[ind2,:],self.V[key,:])>0)-1
+            trick3=2*(np.dot(verts[ind3,:],self.V[key,:])>0)-1
+            if(trick0*trick1>0):
+                edges.append([ind0,ind1])
+            if(trick0*trick3>0):
+                edges.append([ind0,ind3])
+            if(trick1*trick2>0):
+                edges.append([ind2,ind1])
+            if(trick2*trick3>0):
+                edges.append([ind2,ind3])
+            #trick0=np.dot(verts[ind0,:],self.V[key,:])>0
+            #if(np.dot(verts[ind0,:],verts[ind1,:])>0):
+            #    edges.append([ind0,ind1])
+            #if(np.dot(verts[ind0,:],verts[ind3,:])>0): 
+            #    edges.append([ind0,ind3])
+            #if(np.dot(verts[ind2,:],verts[ind1,:])>0):
+            #    edges.append([ind2,ind1])        
+            #if(np.dot(verts[ind2,:],verts[ind3,:])>0):
+            #    edges.append([ind2,ind3])
+        return(edges,verts)    
+
 
     def compute_gains(self):
         '''
