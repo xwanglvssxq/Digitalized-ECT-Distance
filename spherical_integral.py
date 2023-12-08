@@ -11,7 +11,7 @@ def cartesian_to_spherical(x, y, z):
     return phi, tau
 
 def solve_great_circle(phi_1, tau_1, phi_2, tau_2):
-    tol = 0.0001
+    tol = 0.000001
 
     # compute phi_0, a
     r1 = np.cos(phi_1) * np.tan(tau_2) - np.cos(phi_2) * np.tan(tau_1)

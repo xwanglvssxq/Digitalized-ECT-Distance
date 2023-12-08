@@ -5,7 +5,7 @@ import math
 def detect_rot(p1, p2, p3, pi):
     # Here p1, p2, p3, pi are the Cartesian coordinates
     # Set tolerence
-    tol = 0.0001
+    tol = 0.000001
 
     # Detect poles
     if np.abs(p1[2]) > 1-tol: return False
@@ -20,9 +20,9 @@ def detect_rot(p1, p2, p3, pi):
     if pi[0] > 0 and np.abs(pi[1]) == 0: return False
 
     # Detect meridian
-    if np.abs(p1[0] * p2[1] - p2[0] * p1[1]) == 0: return False
-    if np.abs(p2[0] * p3[1] - p3[0] * p2[1]) == 0: return False
-    if np.abs(p3[0] * p1[1] - p1[0] * p3[1]) == 0: return False
+    if np.abs(p1[0] * p2[1] - p2[0] * p1[1]) <= tol: return False
+    if np.abs(p2[0] * p3[1] - p3[0] * p2[1]) <= tol: return False
+    if np.abs(p3[0] * p1[1] - p1[0] * p3[1]) <= tol: return False
 
     # Detect equator
     count_zeros = np.count_nonzero([p1[2], p2[2], p3[2]] == 0)
@@ -45,7 +45,6 @@ def detect_rot(p1, p2, p3, pi):
 def roted_sphere(p1, p2, p3, pi):
     truth_value = detect_rot(p1, p2, p3, pi)
     while truth_value == False:
-        #print('rotate')
         rotation_matrix = special_ortho_group.rvs(3)
         p1 = np.dot(rotation_matrix, p1)
         p2 = np.dot(rotation_matrix, p2)
