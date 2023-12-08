@@ -407,7 +407,7 @@ if __name__ == "__main__":
         ECT2 = [[-1, pp0, TT0], [-1, pp1, TT1], [-1, pp2, TT2], [-1, pp3, TT3]]
         d = ECT_distance(ECT1, ECT2)
         print(f'deg={deg}, d_ECT=', d)
-        ECT_store.append(d)
+        D_ECT.append(d)
         
     import matplotlib.pyplot as plt
 
