@@ -204,7 +204,10 @@ def T_intersect(Ti, Tj):
     if len(p_addition) == 2:
         # 0-->2 to 2-->0
         if pt_in_sphtri(Tj[0], Ti[0], Ti[1], Ti[2]) and pt_in_sphtri(Tj[2], Ti[0], Ti[1], Ti[2]):
-            p_addition[0], p_addition[1] = p_addition[1], p_addition[0]
+            tmp0 = p_addition[0]
+            tmp1 = p_addition[1]
+            p_addition = np.array([tmp1, tmp0])
+
     addition = False
     
     # compute three p_ints
@@ -223,17 +226,17 @@ def T_intersect(Ti, Tj):
         #reverse the order since first meet p_ints[1]
         if len(p_ints) == 2:
             if len_arc(Ti[idx_i[0]], p_ints[1]) < len_arc(Ti[idx_i[0]], p_ints[0]):
-                p_ints[0], p_ints[1] = p_ints[1], p_ints[0]
-            
+                tmp0 = p_ints[0]
+                tmp1 = p_ints[1]
+                p_ints = np.array([tmp1, tmp0])
+                            
         if pt_in_sphtri(Ti[idx_i[0]], Tj[0], Tj[1], Tj[2]):
             # state == 'in'
-            # Think about this, it's subtle
             T_int.extend([Ti[idx_i[0]]] + p_ints) # [nparray] + [nparray] = [..., ...]
         else:
             # state == 'out'
             if addition is False:
-                # find a proper timing to insert p_addition(when Ti can go into Tj two times)
-                # len(p_addition) == 2 won't meet this problem
+                # find the proper timing to insert p_addition(when Ti can go into Tj two times)
                 if len(p_addition) == 1 and len(p_ints) != 0:
                     if not any(pt_in_arc(p_ints[0], p_addition[0], pt) for pt in Tj[:]):
                         pass
@@ -250,6 +253,7 @@ def T_intersect(Ti, Tj):
     if len(T_int[:]) > 2:
         return T_int 
     return None
+
 def arc_cir(p1, p2, pk, pl):
     #NOTICE: pk, pl here are not antipodal!
     
@@ -407,7 +411,7 @@ if __name__ == "__main__":
         ECT2 = [[-1, pp0, TT0], [-1, pp1, TT1], [-1, pp2, TT2], [-1, pp3, TT3]]
         d = ECT_distance(ECT1, ECT2)
         print(f'deg={deg}, d_ECT=', d)
-        D_ECT.append(d)
+        ECT_store.append(d)
         
     import matplotlib.pyplot as plt
 
