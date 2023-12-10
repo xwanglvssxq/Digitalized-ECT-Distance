@@ -232,7 +232,8 @@ def T_intersect(Ti, Tj):
                             
         if pt_in_sphtri(Ti[idx_i[0]], Tj[0], Tj[1], Tj[2]):
             # state == 'in'
-            T_int.extend([Ti[idx_i[0]]] + p_ints) # [nparray] + [nparray] = [..., ...]
+            T_int.append(Ti[idx_i[0]])
+            T_int.extend(p_ints)
         else:
             # state == 'out'
             if addition is False:
