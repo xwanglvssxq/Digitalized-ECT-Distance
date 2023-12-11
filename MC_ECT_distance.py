@@ -51,8 +51,24 @@ def get_EF(V, F_idx):
 def ECT_distance_MC(s1, s2, num_pts = 1000):
     V1 = s1.V
     V2 = s2.V
-    F1_idx = s1.T
-    F2_idx = s2.T
+    sorted_T = []
+    for t in T:
+        t = np.sort(t)
+        sorted_T.append(t)
+    F1_idx = sorted_T
+    F2_idx = sorted_T
+    E1, F1 = get_EF(V1, F1_idx)
+    E2, F2 = get_EF(V2, F2_idx)
+    
+    Diff = 0
+    halfspace_normals = gen_S2points(num_pts)
+    for n in halfspace_normals:
+        scalar = np.random.uniform(-1, 1, 1)
+        halfspace_level = scalar * n
+        EC1 = EC(V1, E1, F1, n, halfspace_level)
+        EC2 = EC(V2, E2, F2, n, halfspace_level)
+        Diff += (EC1-EC2)**2
+    return Diff/num_pts
     E1, F1 = get_EF(V1, F1_idx)
     E2, F2 = get_EF(V2, F2_idx)
     
