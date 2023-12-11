@@ -4,7 +4,7 @@ import math
 from itertools import combinations
 from scipy.spatial import Delaunay
 import itertools
-
+import ect_tools
 class Shape:
     # params: self, Vertices, Edges, Triangles
     def __init__(self, vertices, triangles,name=None):
@@ -134,8 +134,13 @@ class Shape:
         for key in self.links:
             edges,verts=self.compute_triangluation(key)
             self.polygon_angles[key]=verts
-            tmp,I=self.construct_fan_triangulation(edges)
-            tmp_T=self.construct_triangulation(I,edges)
+            # Ugly fix but it will work: TODO: Make this right, I bet this is behind the weird behavior in tetrahedron as well
+            triangles=self.vertex_faces[key]
+            if triangles.shape[0]==1:
+                tmp_T=np.stack([[0,2,3],[1,2,3]])
+            else:
+                tmp,I=self.construct_fan_triangulation(edges)
+                tmp_T=self.construct_triangulation(I,edges)
             midpoints=np.zeros(tmp_T.shape)
             for i in range(tmp_T.shape[0]):
                 #import pdb; pdb.set_trace()
@@ -248,6 +253,11 @@ class Shape:
         
     def compute_triangluation(self,key):
         triangles=self.vertex_faces[key]
+        if triangles.shape[0]==1:
+            index=np.where(triangles[0]==key)[0][0]
+            triangle=self.V[triangles.astype(int),:][0]
+            stack,E=ect_tools.triangulate_a_triangle(triangle,index)
+            return(E,stack)
         tmp_verts=np.zeros(triangles.shape)
         for i in range(triangles.shape[0]):
             triangle=triangles[i,:]
