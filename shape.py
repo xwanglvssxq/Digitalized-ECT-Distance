@@ -5,6 +5,7 @@ from itertools import combinations
 from scipy.spatial import Delaunay
 import itertools
 import ect_tools
+from scipy.sparse.csgraph import minimum_spanning_tree
 class Shape:
     # params: self, Vertices, Edges, Triangles
     def __init__(self, vertices, triangles,name=None):
@@ -177,6 +178,19 @@ class Shape:
                 tmpmatrix[ind1,inds[0][j]]=1
                 tmpmatrix[inds[0][j],ind1]=1
         return(tmpmatrix,Imatrix)
+
+    def orient_polygons(self):
+        for key in self.polygon_triangles:
+            triangles=self.polygon_triangles[key]
+            n=triangles.shape[0]
+            dm=np.zeros([n,n])
+            for i in range(n):
+                triangle=triangles[i,:]
+                dm[i,:]=np.array([len(set.intersection(set(triangle),set(triangles[i,:])))==2 \
+                                  for i in range(triangles.shape[0])]).astype(int)
+            mst=minimum_spanning_tree(dm)
+            temppi=ect_tools.transitive_closure(mst)
+            self.polygon_triangles[key]=ect_tools.orient_mst(temppi,mst,triangles)
 
     def unique_list(a_list: list) -> list:
         """

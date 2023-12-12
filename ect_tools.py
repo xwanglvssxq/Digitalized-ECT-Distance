@@ -37,3 +37,87 @@ def triangulate_a_triangle(triangle,index=0):
     Edges=np.stack([[0, 2], [2, 1], [1, 3], [3, 0]]) # The edges are between (0,1) and (2,3)
     # (Need add (2,3)? This would make sense)
     return(stack,Edges)
+
+def align_triangles(base,other):
+    edge=np.array([list(set.intersection(set(base),set(other)))])[0]
+    #print(edge)
+    tmp1=np.where(base==edge[0])[0][0]
+    tmp2=np.where(base==edge[1])[0][0]
+    tmp3=np.where(other==edge[0])[0][0]
+    tmp4=np.where(other==edge[1])[0][0]
+    oddoneout=list(set.difference(set([0,1,2]),set([tmp3,tmp4])))[0]
+    #print(tmp3)
+    #print(tmp4)
+    replacement=np.zeros(3)
+    if((tmp2-tmp1)%2==(tmp4-tmp3)%2): # Flip the triangle if same parity
+        replacement[oddoneout]=other[oddoneout]
+        replacement[tmp3]=other[tmp4]
+        replacement[tmp4]=other[tmp3]
+        #print(replacement)
+    else:
+        replacement[oddoneout]=other[oddoneout]
+        replacement[tmp4]=other[tmp4]
+        replacement[tmp3]=other[tmp3]
+    replacement=replacement.astype(int)
+    return(replacement)
+
+
+# Helper functions for orienting polygon triangulations
+def orient_mst(t,mst,triangles):
+    '''
+    Given a transitive closure and mst,
+    Orients the triangles
+    '''
+    nbs=np.stack([mst.nonzero()[0],mst.nonzero()[1]]).T
+    for i in range(len(list(t))):
+        root=np.array(list(t[i]))[0]
+        targetset=t[i]
+        seen=set([root])
+        unseen=set.difference(targetset,seen)
+        seenlist=list(seen)
+        while (len(unseen)>0):
+            new_nbs=nbs[np.where([len(set.intersection(set(nb),seen))==1 for nb in nbs])]
+            #print(new_nbs)
+            newly_seen=nbs[np.where([len(set.intersection(set(nb),seen))==1 for nb in nbs])[0]]
+            seenones=[set(new) for new in newly_seen]
+            for j in range(len(seenones)):
+                edge=newly_seen[j,:]
+                if len(set.intersection(set([edge[0]]),seen))==1:
+                    base=edge[0]
+                    other=edge[1]
+                else:
+                    base=edge[1]
+                    other=edges[0]
+                #print(triangles[other,:])
+                #print(triangles[base,:])
+                triangles[other,:]=align_triangles(triangles[base,:],triangles[other,:])
+                seen=set.union(seen,set(seenones[j]))
+                unseen=set.difference(targetset,seen)
+    return(triangles)
+
+def transitive_closure(mst):
+    '''
+    Given a minimal spanning forest
+    computes the transitive closure of the nbd relations
+    '''
+    nbs=np.stack([mst.nonzero()[0],mst.nonzero()[1]]).T
+    #print(nbs)
+    cap=nbs.shape[0]**2
+    grand_sum=0
+    sets=[set(nb) for nb in nbs]
+    while grand_sum<cap:
+        for i in range(len(sets)):
+            total=sum(len(set1) for set1 in sets)
+            element=sets[i]
+            new_element=element
+            #print(element)
+            inds=np.where([len(set.intersection(element,element2))>0 for element2 in sets])
+            tmp_nbs=nbs[inds]
+            set2=[set(nb) for nb in tmp_nbs]
+            for j in range(len(set2)):
+                new_element=set.union(new_element,set2[j])
+            sets[i]=new_element
+        new_total=sum(len(set1) for set1 in sets)
+        if new_total==total:
+            #print(sets)
+            return(np.unique(sets))
