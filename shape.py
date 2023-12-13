@@ -189,6 +189,8 @@ class Shape:
                 dm[i,:]=np.array([len(set.intersection(set(triangle),set(triangles[i,:])))==2 \
                                   for i in range(triangles.shape[0])]).astype(int)
             mst=minimum_spanning_tree(dm)
+            if (len(mst.nonzero()[0])==0):
+                continue
             temppi=ect_tools.transitive_closure(mst)
             self.polygon_triangles[key]=ect_tools.orient_mst(temppi,mst,triangles)
 
