@@ -4,7 +4,7 @@ import ????
 
 def compute_ECT(infile,outfile):
     s1=Shapereader(infile)
-    ECT=ECT_MC(s1)
+    ECT=compute_ECT_MC(s1)
     np.save(outfile,ECT)
 
 def compute_ECT_MC(shape,p=100)

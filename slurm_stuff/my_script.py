@@ -12,6 +12,6 @@ with open('MC.csv', newline='') as csvfile:
 #Extract the values for A,B,C corresponding to the $SLURM_ARRAY_TASK_ID 
 meshid,mesh_name=params[array_id]
 infile=os.path.join('teeth',mesh_name)
-outfile=os.path.join('outputs'meshid,'.npy')
+outfile=os.path.join('outputs',meshid+'.npy')
 ECT=ect_slurm_tools.compute_ECT(infile,outfile)
 np.save(ECT,outfile)
