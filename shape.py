@@ -6,6 +6,7 @@ from scipy.spatial import Delaunay
 import itertools
 import ect_tools
 from scipy.sparse.csgraph import minimum_spanning_tree
+from scipy.spatial import ConvexHull
 class Shape:
     # params: self, Vertices, Edges, Triangles
     def __init__(self, vertices, triangles,name=None):
@@ -28,6 +29,7 @@ class Shape:
         # Note: these are in the same order as the self.polygon_angles
         self.sphere_point_names={}
         self.oriented_polygon_triangles={}
+        self.clean_polygon_midpoints={}
         
     def center_n_scale(self):
         '''
@@ -79,6 +81,48 @@ class Shape:
             self.sphere_point_names[key]=np.concatenate((pointnames,pointnames))
 
     def compute_delaunay_triangles(self):
+        '''
+        The third step. Finds the Delaunay triangulation of the 
+        TODO: Fix the implementation to support vertices with less than 2 neighbors. If the link only contains 2 neighbors we can't get the delaunay triangulation
+        Assuming X is triangulated (so no extra edges), that case is exactly the case where x_0 is the lowest of them all.
+        So this is a tomatowedge shape
+        '''
+        for key in self.polygon_angles:
+            test=self.polygon_angles[key]
+            #t1=np.array([0,0,0])
+            #t1=t1.reshape(1,-1)
+            #t2=np.concatenate([test,t1])
+            D2=ConvexHull(test)
+            #D2=Delaunay(t2)
+            #print(D2.simplices)
+            D1=D2.simplices
+            #print(telek)
+            # post processing here
+            #D1=np.zeros(telek[:,1:4].shape,dtype=int)
+            #print(D2.simplices)
+            #import pdb; pdb.set_trace()
+            #for i in range(telek.shape[0]):
+            #    row=telek[i,:]
+            #    index=np.where(row==np.max(row)) #the old way
+            #    newrow=np.delete(row,index) #the old way
+                #newrow=np.setdiff1d(row,np.max(row))
+                #import pdb; pdb.set_trace()
+                #if index[0][0]%2==1:
+                #    newrow=[newrow[1],newrow[0],newrow[2]]
+            #    D1[i,:]=newrow
+            #print(D1)#2.simplices)
+            #D1=D1-1 # Stupid index thingy
+            midpoints=np.zeros(D1.shape)
+            for i in range(D1.shape[0]):
+                tmp=np.mean(test[D1[i]],0)
+                midpoints[i]=tmp/(np.sum(tmp**2))**(0.5)
+            #D1=np.unique(D1,axis=0)
+            self.polygon_triangles[key]=D1
+            #print(self.polygon_triangles[key])
+            self.polygon_midpoints[key]=midpoints
+
+
+    def compute_delaunay_triangles2(self):
         '''
         The third step. Finds the Delaunay triangulation of the 
         TODO: Fix the implementation to support vertices with less than 2 neighbors. If the link only contains 2 neighbors we can't get the delaunay triangulation
@@ -150,6 +194,40 @@ class Shape:
                 midpoints[i]=tmp/(sum(tmp**2))**(0.5)
             self.polygon_triangles[key]=tmp_T.astype(int)
             self.polygon_midpoints[key]=midpoints
+
+    def compute_TP_DT_vol4(self): # New Dec 23
+        for key in self.links:
+            neighbors=self.links[key]
+            comparisons=np.array([*neighbors]).astype(int)
+            points=np.zeros([math.comb(len(comparisons),2),3])
+            duos=itertools.combinations(comparisons, 2)
+            i=0
+            for duo in duos:
+                trio=np.array([key,*duo])
+                #print(trio)
+                triangle=self.V[trio,:]
+                #print(triangle)
+                n1=self.compute_face_normal(triangle)
+                points[i,:]=n1
+                i=i+1
+            self.polygon_angles[key]=np.concatenate([points,-points])
+            self.compute_delaunay_triangles()
+
+    def compute_TP_DT_vol5(self): # New Dec 23
+        for key in self.links:
+            neighbors=self.links[key]
+            comparisons=np.array([key,*neighbors]).astype(int)
+            points=np.zeros([math.comb(len(comparisons),3),3])
+            trios=itertools.combinations(comparisons, 3)
+            i=0
+            for trio in trios:
+                triangle=self.V[trio,:]
+                n1=self.compute_face_normal(triangle)
+                points[i,:]=n1
+                i=i+1
+            self.polygon_angles[key]=np.concatenate([points,-points])
+            self.compute_delaunay_triangles()
+
 
     def construct_fan_triangulation(self,edges):  # New Nov 23
         '''
@@ -395,6 +473,7 @@ class Shape:
             tmp=np.where(self.polygon_gains[key]!=0)[0]
             self.clean_polygon_triangles[key]=self.polygon_triangles[key][tmp,:]
             self.clean_polygon_gains[key]=self.polygon_gains[key][tmp]
+            self.clean_polygon_midpoints[key]=self.polygon_midpoints[key][tmp]
     def prepare(self):
         '''
         This helper function speedens up the combinatorial ECT evaluation algorithm
