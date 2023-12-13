@@ -95,6 +95,27 @@ def orient_mst(t,mst,triangles):
                 unseen=set.difference(targetset,seen)
     return(triangles)
 
+def test_triangle(triangle,triangle_coords):
+    '''
+    Reorients triangle
+    '''
+    p0=triangle_coords[0,:]
+    p1=triangle_coords[1,:]
+    p2=triangle_coords[2,:]
+    replacement=np.zeros(3)
+    #print(np.dot(p0,np.cross(p1-p0,p2-p0)))
+    #print(triangle)
+    if (np.dot(p0,np.cross(p1-p0,p2-p0))<0):
+        replacement[0]=triangle[0]
+        replacement[1]=triangle[2]
+        replacement[2]=triangle[1]
+    else:
+        replacement[0]=triangle[0]
+        replacement[1]=triangle[1]
+        replacement[2]=triangle[2]
+    #print(replacement)
+    return(replacement.astype(int))
+
 def transitive_closure(mst):
     '''
     Given a minimal spanning forest

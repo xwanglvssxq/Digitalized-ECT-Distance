@@ -27,6 +27,7 @@ class Shape:
         # For vertex i,  dictionary listing all the triple points.
         # Note: these are in the same order as the self.polygon_angles
         self.sphere_point_names={}
+        self.oriented_polygon_triangles={}
         
     def center_n_scale(self):
         '''
@@ -186,6 +187,25 @@ class Shape:
             dm=np.zeros([n,n])
             for i in range(n):
                 triangle=triangles[i,:]
+                triangle_coords=self.polygon_angles[key][triangle,:]
+                triangles[i,:]=ect_tools.test_triangle(triangle,triangle_coords)
+                #dm[i,:]=np.array([len(set.intersection(set(triangle),set(triangles[i,:])))==2 \
+                #                  for i in range(triangles.shape[0])]).astype(int)
+            #mst=minimum_spanning_tree(dm)
+            #if (len(mst.nonzero()[0])==0):
+            #    continue
+            #temppi=ect_tools.transitive_closure(mst)
+            self.polygon_triangles[key]=triangles#ect_tools.orient_mst(temppi,mst,triangles)
+
+
+    def orient_polygons_old(self):
+        for key in self.polygon_triangles:
+            triangles=self.polygon_triangles[key]
+            n=triangles.shape[0]
+            dm=np.zeros([n,n])
+            for i in range(n):
+                triangle=triangles[i,:]
+                #triangleect_tools.test_triangle(triangle)
                 dm[i,:]=np.array([len(set.intersection(set(triangle),set(triangles[i,:])))==2 \
                                   for i in range(triangles.shape[0])]).astype(int)
             mst=minimum_spanning_tree(dm)
