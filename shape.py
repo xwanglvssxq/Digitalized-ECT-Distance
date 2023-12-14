@@ -96,30 +96,29 @@ class Shape:
             #D2=Delaunay(t2)
             #print(D2.simplices)
             D1=D2.simplices
-            #print(telek)
-            # post processing here
-            #D1=np.zeros(telek[:,1:4].shape,dtype=int)
-            #print(D2.simplices)
-            #import pdb; pdb.set_trace()
-            #for i in range(telek.shape[0]):
-            #    row=telek[i,:]
-            #    index=np.where(row==np.max(row)) #the old way
-            #    newrow=np.delete(row,index) #the old way
-                #newrow=np.setdiff1d(row,np.max(row))
-                #import pdb; pdb.set_trace()
-                #if index[0][0]%2==1:
-                #    newrow=[newrow[1],newrow[0],newrow[2]]
-            #    D1[i,:]=newrow
-            #print(D1)#2.simplices)
-            #D1=D1-1 # Stupid index thingy
             midpoints=np.zeros(D1.shape)
             for i in range(D1.shape[0]):
                 tmp=np.mean(test[D1[i]],0)
                 midpoints[i]=tmp/(np.sum(tmp**2))**(0.5)
-            #D1=np.unique(D1,axis=0)
             self.polygon_triangles[key]=D1
-            #print(self.polygon_triangles[key])
             self.polygon_midpoints[key]=midpoints
+
+    def compute_polygon_triangles(self,key):
+        '''
+        The third step. Finds the Delaunay triangulation of the 
+        TODO: Fix the implementation to support vertices with less than 2 neighbors. If the link only contains 2 neighbors we can't get the delaunay triangulation
+        Assuming X is triangulated (so no extra edges), that case is exactly the case where x_0 is the lowest of them all.
+        So this is a tomatowedge shape
+        '''
+        test=self.polygon_angles[key]
+        D2=ConvexHull(test)
+        D1=D2.simplices
+        midpoints=np.zeros(D1.shape)
+        for i in range(D1.shape[0]):
+            tmp=np.mean(test[D1[i]],0)
+            midpoints[i]=tmp/(np.sum(tmp**2))**(0.5)
+        self.polygon_triangles[key]=D1
+        self.polygon_midpoints[key]=midpoints
 
 
     def compute_delaunay_triangles2(self):
@@ -198,6 +197,22 @@ class Shape:
     def compute_TP_DT_vol4(self): # New Dec 23
         for key in self.links:
             neighbors=self.links[key]
+            if(len(neighbors)==2): # The case of an isolated triangle
+                triangleind=np.array([key,*neighbors]).astype(int)
+                triangle=self.V[triangleind,:]
+                #print(triangleind)
+                #print(key)
+                V,T=ect_tools.triangulate_a_triangle(triangle)
+                #print(T)
+                #print(V)
+                midpoints=np.zeros(T.shape)
+                for i in range(T.shape[0]):
+                    tmp=np.mean(V[T[i]],0)
+                    midpoints[i]=tmp/(sum(tmp**2))**(0.5)
+                self.polygon_midpoints[key]=midpoints
+                self.polygon_angles[key]=V
+                self.polygon_triangles[key]=T
+                continue
             comparisons=np.array([*neighbors]).astype(int)
             points=np.zeros([math.comb(len(comparisons),2),3])
             duos=itertools.combinations(comparisons, 2)
@@ -211,7 +226,7 @@ class Shape:
                 points[i,:]=n1
                 i=i+1
             self.polygon_angles[key]=np.concatenate([points,-points])
-            self.compute_delaunay_triangles()
+            self.compute_polygon_triangles(key)
 
     def compute_TP_DT_vol5(self): # New Dec 23
         for key in self.links:
