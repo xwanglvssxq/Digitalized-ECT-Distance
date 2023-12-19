@@ -1,6 +1,7 @@
 import sys
 import csv
-import ect_slurm_tools.py
+import os
+import ect_slurm_tools
 import numpy as np
 # Read in the $SLURM_ARRAY_TASK_ID (Note python indexes start from 0, the arrays were from 1
 array_id=int(sys.argv[1])
@@ -13,5 +14,4 @@ with open('MC.csv', newline='') as csvfile:
 meshid,mesh_name=params[array_id]
 infile=os.path.join('teeth',mesh_name)
 outfile=os.path.join('outputs',meshid+'.npy')
-ECT=ect_slurm_tools.compute_ECT(infile,outfile)
-np.save(ECT,outfile)
+ECT=ect_slurm_tools.compute_ECT(infile, outfile)
