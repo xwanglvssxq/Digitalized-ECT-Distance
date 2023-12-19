@@ -51,12 +51,18 @@ def get_EF(V, F_idx):
 def ECT_distance_MC(s1, s2, num_pts = 1000):
     V1 = s1.V
     V2 = s2.V
-    sorted_T = []
-    for t in T:
+    T1 = s1.T
+    T2 = s2.T
+    sorted_T1 = []
+    sorted_T2 = []
+    for t in T1:
         t = np.sort(t)
-        sorted_T.append(t)
-    F1_idx = sorted_T
-    F2_idx = sorted_T
+        sorted_T1.append(t)
+    for t in T2:
+        t = np.sort(t)
+        sorted_T2.append(t)
+    F1_idx = sorted_T1
+    F2_idx = sorted_T2
     E1, F1 = get_EF(V1, F1_idx)
     E2, F2 = get_EF(V2, F2_idx)
     
