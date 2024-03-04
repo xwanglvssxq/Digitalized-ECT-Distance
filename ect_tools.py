@@ -1,6 +1,7 @@
 from numpy import cross, eye, dot
 from scipy.linalg import expm, norm
 import numpy as np
+from collections import Counter
 def M(axis, theta):
     return expm(cross(eye(3), axis/norm(axis)*theta))
 def normalize(vector):
@@ -182,3 +183,59 @@ def transitive_closure(mst):
         if new_total==total:
             #print(sets)
             return(np.unique(sets))
+
+# The following 3 functions are helper function for
+# going from triangles to polygons
+def find_integer_pairs_with_row_count(S):
+    result = {}
+
+    for row in S:
+        pairs = [(num1, num2) for i, num1 in enumerate(row) for num2 in row[i+1:]]
+        for pair in pairs:
+            result[pair] = result.get(pair, 0) + 1
+
+    return result
+
+def filter_pairs_with_row_count(pairs_with_row_count):
+    filtered_pairs = {pair: count for pair, count in pairs_with_row_count.items() if count == 1}
+    return filtered_pairs
+
+def find_all_cycles(edges):
+    '''
+    Given edges of a cycle, spits out the polygon
+    '''
+    n=len(edges)
+    cycles=list()
+    used_edges=list()
+    unused_edges=list(range(n))
+    while(len(unused_edges)>0):
+        edge_ind=unused_edges[0]
+        edge=edges[edge_ind]
+        used_edges.append(edge_ind)
+        unused_edges.remove(edge_ind)
+        cycle=list()
+        x0=edge[0]
+        xnext=edge[1]
+        cycle.append(x0)
+        cycle.append(xnext)
+        while xnext!=x0:
+            availableones=set([*np.where([len(set.intersection(set(edge),set([xnext])))==1 for edge in edges])[0]])
+            goodone=set.difference(availableones,set(used_edges))
+            used_edges.append([*goodone][0])
+            unused_edges.remove([*goodone][0])
+            nextedge=edges[[*goodone][0]]
+            nextcand=nextedge[0]
+            if(nextcand==xnext):
+                nextcand=nextedge[1]
+                xnext=nextedge[1]
+            else:
+                xnext=nextedge[0]
+            cycle.append(nextcand)
+        cycles.append(cycle)
+    return(cycles)
+
+def polygon_wrapper(S):
+    pairs=find_integer_pairs_with_row_count(S)
+    inds=filter_pairs_with_row_count(pairs)
+    cycles=find_all_cycles([*inds])
+    return(cycles)

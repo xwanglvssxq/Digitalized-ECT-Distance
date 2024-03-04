@@ -30,7 +30,8 @@ class Shape:
         self.sphere_point_names={}
         self.oriented_polygon_triangles={}
         self.clean_polygon_midpoints={}
-        
+        self.clean_polygon_polygons={}
+        self.clean_polygon_polygon_gains={}
     def center_n_scale(self):
         '''
         Not needed for now
@@ -517,3 +518,14 @@ class Shape:
             verts=np.unique(edges,0)
             self.vertex_faces[i]=faces
             self.vertex_edges[i]=edges
+            
+    def triangles_to_polygons(self):
+        for key in self.clean_polygon_triangles:
+            triangles=self.clean_polygon_triangles[key]
+            gainssit=self.clean_polygon_gains[key]
+            triangles_pos=triangles[np.where(gainssit==1)[0],:]
+            triangles_neg=triangles[np.where(gainssit==-1)[0],:]
+            pol_pos=ect_tools.polygon_wrapper(triangles_pos)
+            pol_neg=ect_tools.polygon_wrapper(triangles_neg)
+            self.clean_polygon_polygon_gains[key]=np.array([*np.repeat(1,len(pol_pos)),*np.repeat(-1,len(pol_neg))])
+            self.clean_polygon_polygons[key]=pol_pos+pol_neg
