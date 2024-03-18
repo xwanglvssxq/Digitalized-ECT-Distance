@@ -234,8 +234,80 @@ def find_all_cycles(edges):
         cycles.append(cycle)
     return(cycles)
 
+def cycle_check(cycle):
+    '''
+    returns 0 if the cycle is ok
+    otherwise 1
+    New Mar 18
+    '''
+    output=0
+    new_inds=cycle[:-1]
+    counts=Counter(new_inds)
+    tmp=[*counts.values()]
+    if(max(tmp)>1):
+        output=1
+    return output
+
+def elementary_split(cycle):
+    '''
+    Splits the cycle into 2 pieces
+    New Mar 18
+    '''
+    new_inds=cycle[:-1]
+    counts=Counter(new_inds)
+    tmp=[*counts.values()]
+    tmp2=[*counts.keys()]
+    indices=[i for i, elem in enumerate(tmp) if elem>1]
+    value2=tmp2[indices[0]] # Note: only allow one of these
+    indices2=[i for i, elem in enumerate(new_inds) if elem==value2]
+    list1=[*new_inds[:indices2[0]],*new_inds[indices2[1]:]]
+    list1.append(list1[0])
+    list2=[*new_inds[indices2[0]:indices2[1]]]
+    list2.append(list2[0])
+    return(list1,list2)
+
+def cycle_reducer(cycles):
+    '''
+    New Mar 18
+    This is a bugfix for having a list with multiple points all the time
+    Go through the cycles and split until you can't
+    '''
+    new_cycles=list()
+    for cycle in cycles:
+        #print(cycle)
+        new_inds=cycle[:-1]
+        counts=Counter(new_inds)
+        tmp=[*counts.values()]
+        if(max(tmp)==1): # If no reps don't do anything
+            new_cycles.append(cycle)
+            continue
+        else:
+            tmp_cycles=list()
+            tmp_cycles.append(cycle)
+            while(tmp_cycles):
+                cycle=tmp_cycles.pop()
+                c1,c2=elementary_split(cycle)
+                if(cycle_check(c1)==0):
+                    new_cycles.append(c1)
+                else:
+                    tmp_cycles.append(c1)
+                if(cycle_check(c2)==0):
+                    new_cycles.append(c2)
+                else:
+                    tmp_cycles.append(c2)
+    return(new_cycles)
+
+        
 def polygon_wrapper(S):
     pairs=find_integer_pairs_with_row_count(S)
     inds=filter_pairs_with_row_count(pairs)
     cycles=find_all_cycles([*inds])
+    cycles=cycle_reducer(cycles) #New Mar 18
+    return(cycles)
+
+def polygon_wrapper_old(S):
+    pairs=find_integer_pairs_with_row_count(S)
+    inds=filter_pairs_with_row_count(pairs)
+    cycles=find_all_cycles([*inds])
+    #cycles=cycle_reducer(cycles) #New Mar 18
     return(cycles)
