@@ -1,18 +1,21 @@
-'''
-ECT_distance receive *oriented*(maybe not necessary) *ECT2 reversed jump* digitization.
-'''
+#Remember to check:
+#1. pts on spherical polygon should be normalied at least and only once (done in orientation)
+#2. polygons in ECT should be in correct orientation (done in orientation)
 
+from scipy.stats import special_ortho_group
 import numpy as np
 import math
-from scipy.stats import special_ortho_group
 from scipy import integrate
+from shape_reader import ShapeReader
 
-tol = 0.000001 # e-06 is enough, too small tol causes problems
+tol = 0.000001 
+# e-06 is enough, too small tol causes problems
+# depends on the data precision
 
 def detect_rot(P, pi):
-    tol = 0.000001
+    # Here p1, p2, p3, pi are the Cartesian coordinates
     N = len(P)
-    
+
     # Detect poles
     for i in range(N):
         if np.abs(P[i][2]) > 1-tol: return False
@@ -63,7 +66,6 @@ def solve_great_circle(phi_1, tau_1, phi_2, tau_2):
     r1 = np.cos(phi_1) * np.tan(tau_2) - np.cos(phi_2) * np.tan(tau_1)
     r2 = -np.sin(phi_1) * np.tan(tau_2) + np.sin(phi_2) * np.tan(tau_1)
 
-    #if r2 = 0:
     if np.abs(r2) < tol:
         phi_0 = np.pi/2
         # phi_0 can be -pi/2 with 'a' becoming '-a', we get the same equation                                
@@ -115,127 +117,113 @@ def int_polygon(P, pi):
 
     return I
 
+def fast_cross(a, b):
+    c = np.empty(3)
+    c[0] = a[1]*b[2] - a[2]*b[1]
+    c[1] = a[2]*b[0] - a[0]*b[2]
+    c[2] = a[0]*b[1] - a[1]*b[0]
+    return c
+
+def fast_dot(a, b):
+    d = a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
+    return d
+
+def fast_norm(a):
+    n = fast_dot(a, a) ** 0.5
+    return n
+
+def fast_compare(a,b):
+    if np.abs(a[0]-b[0]) < tol and np.abs(a[1]-b[1]) < tol and np.abs(a[2]-b[2]) < tol:
+        return True
+    return False
+
 def len_arc(p1, p2):
     # length of the great arc(the shorter one) on a unit sphere
+    # need to include pi
     # p1, p2: 3d-np.array
     
     # Normalization is very important here! Make everything coherent with tol.
-    p1 = p1/np.linalg.norm(p1)
-    p2 = p2/np.linalg.norm(p2)
-    if np.abs(np.dot(p1, p2)) <= 1:
-        return np.arccos(np.dot(p1, p2))
-    elif np.abs(np.dot(p1, p2)) > 1:
-        return 0
-    else:
-        print('wrong inner product in len_arc')
-        return None
+    # Normalized in pt_in_arc
     
-def arc_diff(p, p1, p2):
-    arc_diff = len_arc(p, p1) + len_arc(p, p2) - len_arc(p1, p2)
-    return arc_diff
+    pdot = fast_dot(p1, p2)
+    if pdot > 1: pdot = 1
+    if pdot < -1: pdot = -1
+    length = np.arccos(pdot)
+    return length
 
 def pt_in_arc(p, p1, p2):
+    p = p/fast_norm(p)
+    p1 = p1/fast_norm(p1)
+    p2 = p2/fast_norm(p2)
     arc_diff = len_arc(p, p1) + len_arc(p, p2) - len_arc(p1, p2)
     if np.abs(arc_diff) < tol: 
         return True
     else: 
         return False
 
-def great_cir(p1, p2):
-    # return (pi, pj) s.t. piv=pjv on this arc
-    # NOT active points
-    pi = np.cross(p1, p2)
-    pi = pi/np.linalg.norm(pi)
-    pj = -pi
-    return pi, pj
-    
-def arc_overlap(p11, p12, p21, p22):
-    pi, pj = great_cir(p11, p12)
-    pk, pl = great_cir(p21, p22)
-    if (np.abs(pi-pk) <= tol).all() or (np.abs(pi+pk) <= tol).all():
-        return True
-    return False
-
 def arc_arc(p11, p12, p21, p22):
-    pi, pj = great_cir(p11, p12)
-    pk, pl = great_cir(p21, p22)
-    
-    if arc_overlap(p11, p12, p21, p22):
+    p1 = fast_cross(p11, p12)
+    p2 = fast_cross(p21, p22)
+
+    #VERY GOOD necessary condition of no intersection
+    if fast_dot(p1, p21) * fast_dot(p1, p22) > 0 or fast_dot(p2, p11) * fast_dot(p2, p12) > 0:
         return None
-    
-    # good necessary condition of no intersection
-    if np.dot(pi-pj, p21) * np.dot(pi-pj, p22) > 0 or np.dot(pk-pl, p11) * np.dot(pk-pl, p12) > 0:
-        return None
+    v = fast_cross(p1, p2)
+    nv = fast_norm(v)
+    if nv == 0: return None
+    v = v/nv
+    # exclude the antipodal point
+    # if data points aren't precise enough, problem may arise in the following 'if'
+    if pt_in_arc(v, p11, p12) and pt_in_arc(v, p21, p22):
+        return v
+    elif pt_in_arc(-v, p11, p12) and pt_in_arc(-v, p21, p22):
+        return -v
     else:
-        indexes = [[1,2,0],[0,2,1],[0,1,2]]
-        for idx in indexes:
-            
-            A = np.array([[pi[idx[0]]-pj[idx[0]], pi[idx[1]]-pj[idx[1]]], [pk[idx[0]]-pl[idx[0]], pk[idx[1]]-pl[idx[1]]]])
-            b = np.array([pj[idx[2]]-pi[idx[2]], pl[idx[2]]-pk[idx[2]]])
-            # Assume first v = [1, a, b] or [a, 1, b] or [a, b, 1], then normalize
-            # Solve Ax = b, i.e. {p_iv-p_jv=0, p_kv-p_lv=0}
-            if np.linalg.det(A) == 0:
-                continue
-            else:
-                v_raw = np.linalg.solve(A, b)
-                v_raw = np.insert(v_raw, idx[2],1)
-                break
-        
-        v = v_raw/np.sqrt(np.dot(v_raw,v_raw))
-        if pt_in_arc(v, p11, p12) and pt_in_arc(v, p21, p22):
-            return v
-        elif pt_in_arc(-v, p11, p12) and pt_in_arc(-v, p21, p22):
-            return -v
-        else:
-            return None
-        
-def pt_in_sphtri(p, p1, p2, p3):
-    if sph_area(p, p1, p2) == None or sph_area(p, p2, p3) == None or sph_area(p, p3, p1) == None:
-        return False
-    area_diff = sph_area(p, p1, p2) + sph_area(p, p2, p3) + sph_area(p, p3, p1) - sph_area(p1, p2, p3)
-    if np.abs(area_diff) < tol: 
-        return True
-    else: 
-        return False
-    
+        return None
+
 def sph_angle(p1, p2, p3):
-    v1_raw = np.cross(np.cross(p2, p1),p2)
-    v2_raw = np.cross(np.cross(p2, p3),p2)
+    # Check coinciding point/points on the same arc to avoid /0
+    # then v1_raw, v2_raw can't be 0 in this case
+    # Have checked in sph_area
+    v1_raw = fast_cross(fast_cross(p2, p1),p2)
+    v2_raw = fast_cross(fast_cross(p2, p3),p2)
     
     # Special case of antipodal points
-    if np.linalg.norm(v1_raw) == 0 or np.linalg.norm(v2_raw) == 0:
+    if fast_norm(v1_raw) == 0 or fast_norm(v2_raw) == 0:
         return None
     
-    v1 = v1_raw/np.linalg.norm(v1_raw)
-    v2 = v2_raw/np.linalg.norm(v2_raw)
+    v1 = v1_raw/fast_norm(v1_raw)
+    v2 = v2_raw/fast_norm(v2_raw)
     
-    inprod = np.dot(v1, v2)
+    inprod = fast_dot(v1, v2)
     if inprod > 1: inprod = 1
     if inprod < -1: inprod = -1
     return np.arccos(inprod)
 
-def sph_area(p1, p2, p3):
-    p1 = p1/np.linalg.norm(p1)
-    p2 = p2/np.linalg.norm(p2)
-    p3 = p3/np.linalg.norm(p3)
-    if (np.abs(p1-p2) < tol).all(): return 0
-    if (np.abs(p2-p3) < tol).all(): return 0
-    if (np.abs(p1-p3) < tol).all(): return 0
-    if sph_angle(p1, p2, p3) == None or sph_angle(p2, p3, p1) == None or sph_angle(p3, p1, p2) == None:
-        return None
-    return sph_angle(p1, p2, p3) + sph_angle(p2, p3, p1) + sph_angle(p3, p1, p2) - np.pi
-
 def polygon_area(P):
+    #used in ECT_distance
     N = len(P)
     S = 0
     for i in range(N):
-        P[i] = P[i]/np.linalg.norm(P[i])
+        P[i] = P[i]/fast_norm(P[i])
     for i in range(N):
         if (np.abs(P[i]-P[(i+1)%N]) < tol).all(): return 0
         if sph_angle(P[i], P[(i+1)%N], P[(i+2)%N]) == None: return None
         S += sph_angle(P[i], P[(i+1)%N], P[(i+2)%N])
     return S - (N-2) * np.pi
 
+def pt_in_sphpoly(pt, P):
+    #ECT is orientized in orientation(return_ECT)
+    N = len(P)
+    n0 = fast_cross(P[0], P[1])
+
+    for i in range(N):
+        n = fast_cross(P[i], P[(i+1)%N])
+        n_value = fast_dot(n, pt)
+        #if n_value < 0: return False
+        if n_value < -tol: return False
+    return True
+            
 def del_repetition(P_int):
     P_int = np.array(P_int)
     # check up to demicals=3
@@ -244,52 +232,90 @@ def del_repetition(P_int):
     P_int = P_int[np.sort(P_indices)]
     return P_int
 
+def oppo_semi(n, P):
+    # n is a normal vector for an edge, if P[i]*n<0 for any i, no intersections beween P and the polygon for n
+    N = len(P)
+    for i in range(N):
+        #if fast_dot(n, P[i]) > 0: return False
+        if fast_dot(n, P[i]) > tol: return False
+    return True
+
+def necessary_nointersect(P1, P2):
+    #GOOD(maybe BEST) necessary condition for no intersection
+    #ECT is orientized in orientation(return_ECT)
+    N1 = len(P1)
+    n0 = fast_cross(P1[0], P1[1])
+
+    for i in range(N1):
+        n = fast_cross(P1[i], P1[(i+1)%N1])
+        if oppo_semi(n, P2): return True
+    return False
+        
 def P_intersect(P1, P2):
     '''
-    Pi = [[ai], [pi], B = [oriented boundary: [v0, v1, v2, ..., vn]]
+    Pi = [v0, v1, v2, ..., vn]
+    Better to be oriented
     '''
+    if necessary_nointersect(P1, P2): return None
+    
     pts = []
     N1 = len(P1)
     N2 = len(P2)
-    P1_in = np.zeros(N1, dtype=int)
-    P2_in = np.zeros(N2, dtype=int)
-    
     
     for i in range(N1):
         for j in range(N2):
-            
-            #check if P2[j] inside P1(or converse)
-            if P1_in[i] == 0 and j > 0 and j < N2-1: 
-                if pt_in_sphtri(P1[i], P2[0], P2[j], P2[j+1]):
-                    pts.append(P1[i])
-                    P1_in[i] = 1
-            if P2_in[j] == 0 and i > 0 and i < N1-1:
-                if pt_in_sphtri(P2[j], P1[0], P1[i], P1[i+1]): 
-                    pts.append(P2[j])
-                    P2_in[j] = 1
-            
             #Check if (P1[i], P1[i+1]) intersects with (P2[j], P2[j+1])
-            #No need for colinear case
+            #No need for colinear case, which is considered by pt_in_sphpoly
             p_int = arc_arc(P1[i], P1[(i+1)%N1], P2[j], P2[(j+1)%N2])
             if p_int is not None: pts.append(p_int) 
+    pts = del_repetition(pts)
+    pts = pts.tolist()
+    N3 = len(pts)
 
+    #There are at least 2 intersections in nontrivial cases
+    if N3 > 1:
+        for i in range(N1):
+            if pt_in_sphpoly(P1[i], P2): pts.append(P1[i])
+        for j in range(N2):
+            if pt_in_sphpoly(P2[j], P1): pts.append(P2[j])
+            
+    #check if P2[j] inside P1(or converse)     
+    elif pt_in_sphpoly(P1[0], P2):
+        pts.append(P1[0])
+        for i in range(N1):
+            if i > 0 and pt_in_sphpoly(P1[i], P2): pts.append(P1[i])
+    elif pt_in_sphpoly(P2[0], P1):
+        pts.append(P2[0])
+        for j in range(N2):
+            if j > 0 and pt_in_sphpoly(P2[j], P1): pts.append(P2[j])
+    else: return None
+            
     #clean data
     pts = del_repetition(pts)
     if len(pts) <= 2: return None
     
-    n = pts[0]/np.linalg.norm(pts[0])
-    proj_pts = [pts[i] - np.dot(pts[i], n) * n for i in range(len(pts))]
+    #find a normal vector
+    n = pts[0]/fast_norm(pts[0])
+    proj_pts = [pts[i] - fast_dot(pts[i], n) * n for i in range(len(pts))]
     # rearrange angles from neg to pos, get index
-    angles = [np.sign(np.dot(n , np.cross(proj_pts[1], proj_pts[i+1]))) * np.degrees( np.arccos(np.clip(np.dot(proj_pts[1]/np.linalg.norm(proj_pts[1]) , proj_pts[i+1]/np.linalg.norm(proj_pts[i+1]) ), -1, 1)) ) for i in range(len(pts)-1)]
+    angles = [np.sign(fast_dot(n , fast_cross(proj_pts[1], proj_pts[i+1]))) * np.degrees( np.arccos(np.clip(fast_dot(proj_pts[1]/fast_norm(proj_pts[1]) , proj_pts[i+1]/fast_norm(proj_pts[i+1]) ), -1, 1)) ) for i in range(len(pts)-1)]
     angles = np.array(angles)
     sorted_indices = angles.argsort()
     sorted_pts = pts[sorted_indices+1]
     sorted_pts = np.vstack((pts[0], sorted_pts))
     return sorted_pts
 
+def great_cir(p1, p2):
+    # return (pi, pj) s.t. piv=pjv on this arc
+    # NOT active points
+    pi = fast_cross(p1, p2)
+    # must normalize since comparison in arc_cir
+    pi = pi/fast_norm(pi)
+    pj = -pi
+    return pi, pj
+
 def arc_cir(p1, p2, pk, pl):
-    #NOTICE: pk, pl here are not antipodal!
-    
+    #NOTICE: pk, pl here are NOT antipodal!
     # check whether arc p1->p2 intersects piv=pjv
     if np.dot(pk-pl, p1) * np.dot(pk-pl, p2) > 0:
         return None
@@ -310,7 +336,7 @@ def arc_cir(p1, p2, pk, pl):
                 v_raw = np.linalg.solve(A, b)
                 v_raw = np.insert(v_raw, idx[2],1)
                 break
-        v = v_raw/np.sqrt(np.dot(v_raw,v_raw))
+        v = v_raw/fast_norm(v_raw)
 
         if pt_in_arc(v, p1, p2): 
             p_int = v
@@ -366,16 +392,19 @@ def P_div(Pi, Pj, pi, pj):
 
 
 def ECT_distance(ECT1, ECT2):
+    #original version, to accelarate computation, we use ECT_distance_s and ECT_distance_d
     '''
     Formation of 'ECT1':
     ECT1 = sum alpha_i * f_i
-    should be stored as array of triples: (alpha_i, p_i, P_i), i.e. active point
+    should be stored as array of triples: (alpha_i, p_i, T_i), i.e. active point
     
     Example:
-    ECT1 = [[alpha_0, p_0, P_0], [alpha_1, p_1, P_1], ..., [alpha_n, p_n, P_n]]
+    ECT1 = [[alpha_0, p_0, T_0], [alpha_1, p_1, T_1], ..., [alpha_n, p_n, T_n]]
     '''
     ECT = ECT1 + ECT2
     integral = 0
+    del1 = 0
+    del2 = 0
     
     for idx1 in range(len(ECT)):
         for idx2 in range(len(ECT)):
@@ -393,8 +422,134 @@ def ECT_distance(ECT1, ECT2):
             integral += ECT[idx1][0] * ECT[idx2][0] * (integral_s - integral_i - integral_j)
     return integral
 
+def ECT_distance_s(ECT):
+    '''
+    d_ECT = \int\sum(ECT1-ECT2)^2 
+          = \int\sum (ECT1[i]*ECT1[j] + ECT2[i]*ECT2[j] - 2 * ECT1[i] * ECT2[j])
+    ECT_s computes the first two terms
+    ECT_d computes the last term
+    '''
+    integral = 0
+    
+    for idx1 in range(len(ECT)):
+        for idx2 in range(len(ECT)):
+            # Same active point, no intersections for a single ECT
+            if fast_compare(ECT[idx1][1], ECT[idx2][1]) and idx1 != idx2:
+                continue
+
+            integral_i = 0
+            integral_j = 0
+            integral_s = 0
+            P_divi, P_divj = P_div(ECT[idx1][2], ECT[idx2][2], ECT[idx1][1], ECT[idx2][1])
+            if len(P_divi) > 2:
+                integral_i = int_polygon(P_divi, ECT[idx1][1])
+                integral_s += polygon_area(P_divi)
+            if len(P_divj) > 2:
+                integral_j = int_polygon(P_divj, ECT[idx2][1])
+                integral_s += polygon_area(P_divj)
+                    
+            integral += ECT[idx1][0] * ECT[idx2][0] * (integral_s - integral_i - integral_j)
+            
+    return integral
+
+def ECT_distance_d(ECT1, ECT2):
+    integral = 0
+    
+    for idx1 in range(len(ECT1)):
+        for idx2 in range(len(ECT2)):
+            integral_i = 0
+            integral_j = 0
+            integral_s = 0
+            P_divi, P_divj = P_div(ECT1[idx1][2], ECT2[idx2][2], ECT1[idx1][1], ECT2[idx2][1])
+            if len(P_divi) > 2:
+                integral_i = int_polygon(P_divi, ECT1[idx1][1])
+                integral_s += polygon_area(P_divi)
+            if len(P_divj) > 2:
+                integral_j = int_polygon(P_divj, ECT2[idx2][1])
+                integral_s += polygon_area(P_divj)
+                    
+            integral += -1 * ECT1[idx1][0] * ECT2[idx2][0] * (integral_s - integral_i - integral_j)
+
+    return integral
+
 ###### Auxiliary functions ######
+
+def orientation(ECT):
+    #Change orientation and normalized sphpoly
+    N = len(ECT)
+    for t in range(N):
+        n = fast_cross(ECT[t][2][0], ECT[t][2][1])
+        # assume the orientation to be P[0]-->P[1]--...-->P[n-1]
+        if fast_dot(n, ECT[t][2][2]) < 0:
+            #print(t)
+            tmp = ECT[t][2].copy()
+            reversed_ECT = tmp[::-1]
+            ECT[t][2] = reversed_ECT
+        M = len(ECT[t][2])
+        for i in range(M):
+            tmp1 = ECT[t][2][i].copy()
+            normed_ECT = tmp1/fast_norm(tmp1)
+            ECT[t][2][i] = normed_ECT
+    return ECT
+
+def return_ECT(s1):
+    tmp=[]
+    for key in s1.clean_polygon_polygon_gains:
+        #tmp=[]
+        TMP=s1.clean_polygon_polygon_gains[key]
+        for j in range(TMP.shape[0]):
+            megatmp=[]
+            megatmp.append(TMP[j])
+            megatmp.append(s1.V[key,:])
+            poly = s1.polygon_angles[key][s1.clean_polygon_polygons[key][j][:],:]
+            poly = np.delete(poly, -1, axis = 0)
+            megatmp.append(poly)            
+            tmp.append(megatmp)
+    ECT1_raw = tmp
+    ECT1 = orientation(ECT1_raw)
+    return ECT1
+
+def com_ECT(degrees = 0, v = [0,0,1], file1 = 'octahedron.off', file2 = 'octahedron.off'):
+    #s1=ShapeReader.shape_from_file('H16_sas_aligned.off')
+    #s2=ShapeReader.shape_from_file('P30_sas_aligned.off')
+    s1=ShapeReader.shape_from_file(file1)
+    s2=ShapeReader.shape_from_file(file2)
+    #s2=ShapeReader.shape_from_file('small_teeth.off')
+    
+    #do we need this???
+    #############################################################
+    for i in range(s1.V.shape[0]):
+        s1.V[i,:] = s1.V[i,:]/(np.sum(s1.V[i,:]**2)**(0.5))
+    for i in range(s2.V.shape[0]):
+        s2.V[i,:] = s2.V[i,:]/(np.sum(s2.V[i,:]**2)**(0.5))
+        s2.V[i,:] = rotate_axis(s2.V[i,:], v, degrees)
+    ############################################################# 
+    
+    s1.prepare()
+    s1.compute_links()
+    s1.compute_TP_DT_vol4()
+    s1.compute_gains()
+    s1.clean_triangles()
+    s1.orient_polygons()
+    s1.triangles_to_polygons()
+    s2.prepare()
+    s2.compute_links()
+    s2.compute_TP_DT_vol4()
+    s2.compute_gains()
+    s2.clean_triangles()
+    s2.orient_polygons()
+    s2.triangles_to_polygons()
+
+    ECT1 = return_ECT(s1)
+    ECT2 = return_ECT(s2)
+
+    return ECT_distance_s(ECT1) + ECT_distance_s(ECT2) + 2 * ECT_distance_d(ECT1,ECT2)
+
+
 def rotate_axis(vector, axis, angle):
+    """
+    angle: in degree
+    """
     axis = axis / np.linalg.norm(axis)
     angle = angle/360 * 2 * np.pi
     cos_angle = np.cos(angle)
@@ -405,77 +560,3 @@ def rotate_axis(vector, axis, angle):
     rotation_matrix = cos_angle * np.eye(3) + sin_angle * cross_product_matrix + (1 - cos_angle) * np.outer(axis, axis)
     
     return np.dot(rotation_matrix, vector)
-
-def return_ECT(s1,s2):
-    tmp=[]
-    for key in s1.clean_polygon_gains:
-        TMP=s1.clean_polygon_gains[key]
-        for j in range(TMP.shape[0]):
-            megatmp=[]
-            megatmp.append(TMP[j])
-            megatmp.append(s1.V[key,:])
-            megatmp.append(s1.polygon_angles[key][s1.polygon_triangles[key][j,:],:])
-            tmp.append(megatmp)
-    tmp2=[]
-    for key in s2.clean_polygon_gains:
-        TMP=-s2.clean_polygon_gains[key]
-        for j in range(TMP.shape[0]):
-            megatmp=[]
-            megatmp.append(TMP[j])
-            megatmp.append(s2.V[key,:])
-            megatmp.append(s2.polygon_angles[key][s2.polygon_triangles[key][j,:],:])
-            tmp2.append(megatmp)
-    ECT1=tmp
-    ECT2=tmp2
-    return ECT1, ECT2
-
-from shape_reader import ShapeReader
-
-def com_ECT(degrees, v):
-    s1=ShapeReader.shape_from_file('meshes/octahedron.off')
-    s2=ShapeReader.shape_from_file('meshes/octahedron.off')
-    for i in range(s1.V.shape[0]):
-        s1.V[i,:] = s1.V[i,:]/(np.sum(s1.V[i,:]**2)**(0.5))
-    for i in range(s2.V.shape[0]):
-        s2.V[i,:] = s2.V[i,:]/(np.sum(s2.V[i,:]**2)**(0.5))
-        s2.V[i,:] = rotate_axis(s2.V[i,:], v, degrees)
-        #v=v/sum(v**2)**(0.5)
-    s1.prepare()
-    s1.compute_links()
-    #s1.compute_TP_DT_vol4()
-    s1.compute_TP_DT_vol3()
-    s1.compute_gains()
-    s1.clean_triangles()
-    s2.prepare()
-    s2.compute_links()
-    #s2.compute_TP_DT_vol4()
-    s2.compute_TP_DT_vol3()
-    s2.compute_gains()
-    s2.clean_triangles()
-    '''
-    ECT1 = return_ECT(s1)
-    ECT2 = return_ECT(s2)
-    '''
-    ECT1, ECT2 = return_ECT(s1, s2)
-    
-    #Change orientation!
-    for t in range(len(ECT1)):
-        vec_1 = ECT1[t][2][1] - ECT1[t][2][0]
-        vec_2 = ECT1[t][2][2] - ECT1[t][2][0]
-        # assume the orientation to be T[0]-->T[1]-->T[2]
-        orientation = np.dot(ECT1[t][2][0], np.cross(vec_1, vec_2))    
-        if orientation < 0:
-            tmp1 = ECT1[t][2][2].copy()
-            ECT1[t][2][2] = ECT1[t][2][1]
-            ECT1[t][2][1] = tmp1
-    for t in range(len(ECT2)):
-        vec_3 = ECT2[t][2][1] - ECT2[t][2][0]
-        vec_4 = ECT2[t][2][2] - ECT2[t][2][0]
-        # assume the orientation to be T[0]-->T[1]-->T[2]
-        orientation = np.dot(ECT2[t][2][0], np.cross(vec_3, vec_4))    
-        if orientation < 0:
-            tmp2 = ECT2[t][2][2].copy()
-            ECT2[t][2][2] = ECT2[t][2][1]
-            ECT2[t][2][1] = tmp2
-    
-    return ECT_distance(ECT1, ECT2)
