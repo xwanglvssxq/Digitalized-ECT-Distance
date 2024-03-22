@@ -32,6 +32,8 @@ class Shape:
         self.clean_polygon_midpoints={}
         self.clean_polygon_polygons={}
         self.clean_polygon_polygon_gains={}
+        self.ls_polygons={}
+        self.ls_gains={}
     def center_n_scale(self):
         '''
         Not needed for now
@@ -529,7 +531,37 @@ class Shape:
             pol_neg=ect_tools.polygon_wrapper_old(triangles_neg)
             self.clean_polygon_polygon_gains[key]=np.array([*np.repeat(1,len(pol_pos)),*np.repeat(-1,len(pol_neg))])
             self.clean_polygon_polygons[key]=pol_pos+pol_neg
-            
+
+    def compute_lower_stars(self):
+        for key in self.clean_polygon_triangles:
+            normals=self.clean_polygon_midpoints[key]
+            lower_stars=np.zeros(normals.shape[0])
+            polygons=list()
+            gains=list()
+            for i in range(normals.shape[0]):
+                normal=normals[i]
+                link=self.links[key]
+                test_verts=np.array([key, *link]).astype(int)
+                tmp2=np.matmul(normal.reshape(1,-1),self.V[test_verts].T)
+                tmp3=tmp2-tmp2[0][0]
+                lowerstar=np.where(tmp3<=0)[1]
+                urawaza=sum(2**lowerstar) # make 'em hashable
+                lower_stars[i]=urawaza
+            equiv_classes=np.unique(lower_stars)
+            indlists=list()
+            for klass in equiv_classes:
+                inds=np.where(lower_stars==klass)[0]
+                indlists.append(inds)
+            for i in range(len(indlists)):
+                inds=indlists[i] # triangles in the lower star
+                testind=inds[0] # take the first triangle
+                gains.append(self.clean_polygon_gains[key][testind]) #gain of the star is the gain of any triangle
+                triangles=self.clean_polygon_triangles[key][[*indlists[i]],]
+                pol_pos=ect_tools.polygon_wrapper(triangles)
+                polygons.append(pol_pos)
+            self.ls_polygons[key]=polygons
+            self.ls_gains[key]=gains
+
     def triangles_to_polygons(self):
         for key in self.clean_polygon_triangles:
             polygons=list()
