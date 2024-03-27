@@ -289,12 +289,14 @@ class Shape:
             trios,points,lowerstars=self.compute_polygon_vol3(key)
             #self.polygon_angles=points
             allstars=list(itertools.chain.from_iterable(lowerstars))
-            stars=ect_tools.unique_list(allstars)
+            #stars=ect_tools.unique_list(allstars)
+            stars=list(set(tuple(sorted(s)) for s in allstars))
             stardiaries=list()
             for star in stars:
+                st=set(star)
                 stardiary=list()
                 for i in range(len(lowerstars)):
-                    tmptrick=[tmp==star for tmp in lowerstars[i]]
+                    tmptrick=[tmp==st for tmp in lowerstars[i]]
                     if(sum(tmptrick)==1):
                         stardiary.append(i)
                 stardiaries.append(stardiary)
