@@ -2,6 +2,28 @@ from numpy import cross, eye, dot
 from scipy.linalg import expm, norm
 import numpy as np
 from collections import Counter
+
+def fast_norm(a):
+    n = fast_dot(a, a) ** 0.5
+    return n
+def fast_dot(a, b):
+    d = a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
+    return d
+def fast_cross(a, b):
+    c = np.empty(3)
+    c[0] = a[1]*b[2] - a[2]*b[1]
+    c[1] = a[2]*b[0] - a[0]*b[2]
+    c[2] = a[0]*b[1] - a[1]*b[0]
+    return c
+def sort_polygon(pts):
+    n = pts[0]/fast_norm(pts[0])
+    proj_pts = [pts[i] - fast_dot(pts[i], n) * n for i in range(len(pts))]
+    angles = [np.sign(fast_dot(n , fast_cross(proj_pts[1], proj_pts[i+1]))) * np.degrees( np.arccos(np.clip(fast_dot(proj_pts[1]/fast_norm(proj_pts[1]) , proj_pts[i+1]/fast_norm(proj_pts[i+1]) ), -1, 1)) ) for i in range(len(pts)-1)]
+    angles = np.array(angles)
+    sorted_indices = angles.argsort()
+    inds=[0, *sorted_indices+1]
+    return(inds)
+
 def M(axis, theta):
     return expm(cross(eye(3), axis/norm(axis)*theta))
 def normalize(vector):
@@ -297,7 +319,7 @@ def cycle_reducer(cycles):
                     tmp_cycles.append(c2)
     return(new_cycles)
 
-        
+
 def polygon_wrapper(S):
     pairs=find_integer_pairs_with_row_count(S)
     inds=filter_pairs_with_row_count(pairs)
@@ -311,3 +333,25 @@ def polygon_wrapper_old(S):
     cycles=find_all_cycles([*inds])
     #cycles=cycle_reducer(cycles) #New Mar 18
     return(cycles)
+def unique_list(a_list: list) -> list:
+    """
+    A helper file for topological regularizer
+    Given a list a_list,
+    returns the unique elements in that.
+    Used for computing the connections
+    when building the linear surrogate function
+    Args:
+         a_list:
+             a list
+    Returns
+        uniquelist:
+            a list of unique entries of the list a_list
+    """
+    uniquelist = []
+    used = set()
+    for item in a_list:
+        tmp = repr(item)
+        if tmp not in used:
+            used.add(tmp)
+            uniquelist.append(item)
+    return uniquelist

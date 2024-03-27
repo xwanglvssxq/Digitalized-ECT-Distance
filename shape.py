@@ -34,6 +34,9 @@ class Shape:
         self.clean_polygon_polygon_gains={}
         self.ls_polygons={}
         self.ls_gains={}
+        self.polygons={}
+        self.clean_polygon_gains={}
+        self.clean_polygons={}
     def center_n_scale(self):
         '''
         Not needed for now
@@ -196,6 +199,117 @@ class Shape:
                 midpoints[i]=tmp/(sum(tmp**2))**(0.5)
             self.polygon_triangles[key]=tmp_T.astype(int)
             self.polygon_midpoints[key]=midpoints
+
+    def compute_lower_stars3(self,triplet,epsilon=1e-7):
+        #direction=angle
+        #print(triplet)
+        triangle=self.V[triplet,:]
+        direction=self.compute_face_normal(triangle)
+        key=triplet[0]
+        nbd=[key,*self.links[key].astype(int)]
+        tmp2=np.matmul(direction.reshape(1,-1),self.V[nbd].T)
+        tmp3=tmp2-tmp2[0][0]
+        ls_inds=np.where(tmp3<=0)[1]
+        #print(ls_inds)
+        ls=[nbd[i] for i in ls_inds]
+        set0=set.difference(set(ls),set(triplet))
+        set1=set.union(set0,set([triplet[0]]))
+        set2=set.union(set1,set.union(set([triplet[0]]),set([triplet[1]])))
+        set3=set.union(set1,set.union(set([triplet[0]]),set([triplet[2]])))
+        set4=set.union(set1,set(triplet))
+        r1=[set1,set2,set3,set4]
+        direction=-direction
+        tmp2=np.matmul(direction.reshape(1,-1),self.V[nbd].T)
+        tmp3=tmp2-tmp2[0][0]
+        ls_inds=np.where(tmp3<=0)[1]
+        #print(ls_inds)
+        ls=[nbd[i] for i in ls_inds]
+        set0=set.difference(set(ls),set(triplet))
+        set1=set.union(set0,set([triplet[0]]))
+        set2=set.union(set1,set.union(set([triplet[0]]),set([triplet[1]])))
+        set3=set.union(set1,set.union(set([triplet[0]]),set([triplet[2]])))
+        set4=set.union(set1,set(triplet))
+        r2=[set1,set2,set3,set4]    
+        return(r1,r2)
+
+
+    def compute_polygon_vol3(self,key):
+        '''
+        TODO: Need special case for the boundary
+        '''
+        trios=list()
+        lowerstars=list()
+        neighbors=self.links[key]
+        comparisons=np.array([*neighbors]).astype(int)
+        points=np.zeros([2*math.comb(len(comparisons),2),3])
+        duos=itertools.combinations(comparisons, 2)
+        i=0
+        for duo in duos:
+            trio=np.array([key,*duo])
+            trios.append(trio)
+            trios.append(trio)
+            #print(trio)
+            triangle=self.V[trio,:]
+            #print(triangle)
+            n1=self.compute_face_normal(triangle)
+            l1,l2=self.compute_lower_stars3(trio)#,n1)
+            lowerstars.append(l1)
+            points[i,:]=n1
+            i=i+1
+            points[i,:]=-n1
+            lowerstars.append(l2)
+            i=i+1
+            #lowerstar=compute_lower_stars(shape,trio,-n1)
+            #lowerstars.append(lowerstar)
+            #points[i,:]=-n1
+            #i=i+1 
+        return(trios,points,lowerstars)
+
+    def compute_polygons(self):
+        for key in self.links:
+            neighbors=self.links[key]
+            polygons=list()
+            midpoints=list() #polygon midpoints
+            if(len(neighbors)==2): # The case of an isolated triangle
+                triangleind=np.array([key,*neighbors]).astype(int)
+                triangle=self.V[triangleind,:]
+                V,T=ect_tools.triangulate_a_triangle(triangle)
+                #midpoints=np.zeros(T.shape)
+                for i in range(T.shape[0]):
+                    tmp=np.mean(V[T[i]],0)
+                    midpoints.append(tmp/(sum(tmp**2))**(0.5))
+                    polygons.append(T[i])
+                    #self.polygon_midpoints[key]=tmp/(sum(tmp**2))**(0.5)
+                self.polygon_angles[key]=V
+                self.polygons[key]=polygons
+                self.polygon_midpoints[key]=midpoints
+                continue
+            #polygons=list()
+            #midpoints=list() #polygon midpoints
+            trios,points,lowerstars=self.compute_polygon_vol3(key)
+            #self.polygon_angles=points
+            allstars=list(itertools.chain.from_iterable(lowerstars))
+            stars=ect_tools.unique_list(allstars)
+            stardiaries=list()
+            for star in stars:
+                stardiary=list()
+                for i in range(len(lowerstars)):
+                    tmptrick=[tmp==star for tmp in lowerstars[i]]
+                    if(sum(tmptrick)==1):
+                        stardiary.append(i)
+                stardiaries.append(stardiary)
+            for stardiary in stardiaries:
+                pts=points[stardiary]
+                inds=ect_tools.sort_polygon(pts)
+                polygon=[stardiary[ind] for ind in inds]
+                polygons.append(polygon)
+                tmp=np.mean(points[polygon,:],0)
+                midpoint=tmp/(sum(tmp**2))**(0.5)
+                midpoints.append(midpoint)
+            self.polygons[key]=polygons
+            self.polygon_angles[key]=points
+            self.polygon_midpoints[key]=midpoints
+
 
     def compute_TP_DT_vol4(self): # New Dec 23
         for key in self.links:
@@ -429,6 +543,32 @@ class Shape:
             #    edges.append([ind2,ind3])
         return(edges,verts)    
 
+    def compute_gains2(self):
+        '''
+        Fourth step: evaluate the ECT gains in each triangle of the Delaunay triangulation.
+        '''
+        for key in self.polygon_midpoints:
+            directions=self.polygon_midpoints[key]
+            gains=np.zeros([len(directions),1])
+            for i in range(len(directions)):
+                direction=directions[i]
+                gains[i]=self.evaluate_local_ECT(direction, key)           
+            self.polygon_gains[key]=gains
+        return(True)
+
+    def clean_gains2(self):
+        '''
+        Fourth step: evaluate the ECT gains in each triangle of the Delaunay triangulation.
+        '''
+        for key in self.polygon_midpoints:
+            gains=self.polygon_gains[key]
+            polygons=self.polygons[key]
+            inds=np.where(gains!=0)[0]
+            clean_polygons=[polygons[ind] for ind in inds]
+            clean_gains=gains[inds]
+            self.clean_polygon_gains[key]=clean_gains
+            self.clean_polygons[key]=clean_polygons
+        return(True)
 
     def compute_gains(self):
         '''
