@@ -409,8 +409,6 @@ def ECT_distance(ECT1, ECT2):
     '''
     ECT = ECT1 + ECT2
     integral = 0
-    del1 = 0
-    del2 = 0
     
     for idx1 in range(len(ECT)):
         for idx2 in range(len(ECT)):
@@ -475,6 +473,27 @@ def ECT_distance_d(ECT1, ECT2):
                 integral_s += polygon_area(P_divj)
                     
             integral += -1 * ECT1[idx1][0] * ECT2[idx2][0] * (integral_s - integral_i - integral_j)
+
+    return integral
+
+def ECT_distance_partial(ECT1, ECT2):
+    #integrate ECTs and ECTd, final result should be: ECTp11 + ECTp22 - 2 * ECTp12
+    integral = 0
+    
+    for idx1 in range(len(ECT1)):
+        for idx2 in range(len(ECT2)):
+            integral_i = 0
+            integral_j = 0
+            integral_s = 0
+            P_divi, P_divj = P_div(ECT1[idx1][2], ECT2[idx2][2], ECT1[idx1][1], ECT2[idx2][1])
+            if len(P_divi) > 2:
+                integral_i = int_polygon(P_divi, ECT1[idx1][1])
+                integral_s += polygon_area(P_divi)
+            if len(P_divj) > 2:
+                integral_j = int_polygon(P_divj, ECT2[idx2][1])
+                integral_s += polygon_area(P_divj)
+                    
+            integral += ECT1[idx1][0] * ECT2[idx2][0] * (integral_s - integral_i - integral_j)
 
     return integral
 
