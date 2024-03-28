@@ -1,6 +1,6 @@
-#Remember to check:
-#1. pts on spherical polygon should be normalied at least and only once (done in orientation)
-#2. polygons in ECT should be in correct orientation (done in orientation)
+# Remember to check:
+# 1. pts on spherical polygon should be normalied at least and only once (done in orientation)
+# 2. polygons in ECT should be in correct orientation (done in orientation)
 
 from scipy.stats import special_ortho_group
 import numpy as np
@@ -137,6 +137,11 @@ def fast_compare(a,b):
         return True
     return False
 
+def fast_clip(r):
+    if r > 1: r = 1
+    elif r < -1: r = -1
+    return r
+
 def len_arc(p1, p2):
     # length of the great arc(the shorter one) on a unit sphere
     # need to include pi
@@ -146,8 +151,7 @@ def len_arc(p1, p2):
     # Normalized in pt_in_arc
     
     pdot = fast_dot(p1, p2)
-    if pdot > 1: pdot = 1
-    if pdot < -1: pdot = -1
+    pdot = fast_clip(pdot)
     length = np.arccos(pdot)
     return length
 
@@ -196,8 +200,7 @@ def sph_angle(p1, p2, p3):
     v2 = v2_raw/fast_norm(v2_raw)
     
     inprod = fast_dot(v1, v2)
-    if inprod > 1: inprod = 1
-    if inprod < -1: inprod = -1
+    inprod = fast_clip(inprod)
     return np.arccos(inprod)
 
 def polygon_area(P):
@@ -223,16 +226,19 @@ def pt_in_sphpoly(pt, P):
         #if n_value < 0: return False
         if n_value < -tol: return False
     return True
-            
+
 def del_repetition(P_int):
     P_int = np.array(P_int)
-    # check up to demicals=3
-    P_check = np.round(P_int, decimals=3)
-    _, P_indices = np.unique(P_check, axis=0, return_index=True)
-    P_int = P_int[np.sort(P_indices)]
-    return P_int
+    unique_dict = {}
+    for index, vec in enumerate(P_int):
+        key = tuple(np.round(vec, decimals = 3))
+        if key not in unique_dict:
+            unique_dict[key] = index
+    unique_indices = list(unique_dict.values())
+    unique_vectors = P_int[unique_indices]
+    return unique_vectors
 
-def oppo_semi(n, P):
+def oppo_hemisphere(n, P):
     # n is a normal vector for an edge, if P[i]*n<0 for any i, no intersections beween P and the polygon for n
     N = len(P)
     for i in range(N):
@@ -248,9 +254,9 @@ def necessary_nointersect(P1, P2):
 
     for i in range(N1):
         n = fast_cross(P1[i], P1[(i+1)%N1])
-        if oppo_semi(n, P2): return True
+        if oppo_hemisphere(n, P2): return True
     return False
-        
+
 def P_intersect(P1, P2):
     '''
     Pi = [v0, v1, v2, ..., vn]
@@ -298,7 +304,7 @@ def P_intersect(P1, P2):
     n = pts[0]/fast_norm(pts[0])
     proj_pts = [pts[i] - fast_dot(pts[i], n) * n for i in range(len(pts))]
     # rearrange angles from neg to pos, get index
-    angles = [np.sign(fast_dot(n , fast_cross(proj_pts[1], proj_pts[i+1]))) * np.degrees( np.arccos(np.clip(fast_dot(proj_pts[1]/fast_norm(proj_pts[1]) , proj_pts[i+1]/fast_norm(proj_pts[i+1]) ), -1, 1)) ) for i in range(len(pts)-1)]
+    angles = [np.sign(fast_dot(n , fast_cross(proj_pts[1], proj_pts[i+1]))) * np.arccos(fast_clip(fast_dot(proj_pts[1]/fast_norm(proj_pts[1]) , proj_pts[i+1]/fast_norm(proj_pts[i+1]) )))  for i in range(len(pts)-1)]
     angles = np.array(angles)
     sorted_indices = angles.argsort()
     sorted_pts = pts[sorted_indices+1]
@@ -317,10 +323,10 @@ def great_cir(p1, p2):
 def arc_cir(p1, p2, pk, pl):
     #NOTICE: pk, pl here are NOT antipodal!
     # check whether arc p1->p2 intersects piv=pjv
-    if np.dot(pk-pl, p1) * np.dot(pk-pl, p2) > 0:
+    if fast_dot(pk-pl, p1) * fast_dot(pk-pl, p2) > 0:
         return None
     # overlap and hence no division, use tol to avoid extreme small det(A)
-    elif np.abs(np.dot(pk-pl, p1)) < tol and np.abs(np.dot(pk-pl, p2)) < tol:
+    elif np.abs(fast_dot(pk-pl, p1)) < tol and np.abs(fast_dot(pk-pl, p2)) < tol:
         return None
     else:
         pi, pj = great_cir(p1, p2)
@@ -350,7 +356,7 @@ def arc_cir(p1, p2, pk, pl):
                 p_int = -v
 
         return p_int
-    
+
 def P_div(Pi, Pj, pi, pj):
     P_int = P_intersect(Pi, Pj)
     P_divi = []
@@ -365,13 +371,13 @@ def P_div(Pi, Pj, pi, pj):
         return np.array(P_int), np.array([])
     
     for idx_pt, pt in enumerate(P_int):
-        if np.dot(pt, pi-pj) == 0:
+        if fast_dot(pt, pi-pj) == 0:
             P_divi.append(pt)
             P_divj.append(pt)
         else:
-            if np.dot(pt, pi-pj) < 0:
+            if fast_dot(pt, pi-pj) < 0:
                 P_divj.append(pt)
-            if np.dot(pt, pi-pj) > 0:
+            if fast_dot(pt, pi-pj) > 0:
                 P_divi.append(pt)
             # n-1 ----> 0
             if idx_pt == len(P_int) - 1:
@@ -472,7 +478,7 @@ def ECT_distance_d(ECT1, ECT2):
 
     return integral
 
-###### Auxiliary functions ######
+# ##### Auxiliary functions ######
 
 def orientation(ECT):
     #Change orientation and normalized sphpoly
@@ -494,15 +500,15 @@ def orientation(ECT):
 
 def return_ECT(s1):
     tmp=[]
-    for key in s1.clean_polygon_polygon_gains:
+    for key in s1.clean_polygon_gains:
         #tmp=[]
-        TMP=s1.clean_polygon_polygon_gains[key]
+        TMP=s1.clean_polygon_gains[key]
         for j in range(TMP.shape[0]):
             megatmp=[]
             megatmp.append(TMP[j])
             megatmp.append(s1.V[key,:])
-            poly = s1.polygon_angles[key][s1.clean_polygon_polygons[key][j][:],:]
-            poly = np.delete(poly, -1, axis = 0)
+            poly = s1.polygon_angles[key][s1.clean_polygons[key][j]]
+            #poly = np.delete(poly, -1, axis = 0)
             megatmp.append(poly)            
             tmp.append(megatmp)
     ECT1_raw = tmp
@@ -527,18 +533,14 @@ def com_ECT(degrees = 0, v = [0,0,1], file1 = 'octahedron.off', file2 = 'octahed
     
     s1.prepare()
     s1.compute_links()
-    s1.compute_TP_DT_vol4()
-    s1.compute_gains()
-    s1.clean_triangles()
-    s1.orient_polygons()
-    s1.triangles_to_polygons()
+    s1.compute_polygons()
+    s1.compute_gains2()
+    s1.clean_gains2()
     s2.prepare()
     s2.compute_links()
-    s2.compute_TP_DT_vol4()
-    s2.compute_gains()
-    s2.clean_triangles()
-    s2.orient_polygons()
-    s2.triangles_to_polygons()
+    s2.compute_polygons()
+    s2.compute_gains2()
+    s2.clean_gains2()
 
     ECT1 = return_ECT(s1)
     ECT2 = return_ECT(s2)
