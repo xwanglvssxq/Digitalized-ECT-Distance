@@ -531,6 +531,7 @@ def return_ECT(s1):
             megatmp.append(TMP[j])
             megatmp.append(s1.V[key,:])
             poly = s1.polygon_angles[key][s1.clean_polygons[key][j]]
+            if len(poly) < 3: continue
             #poly = np.delete(poly, -1, axis = 0)
             megatmp.append(poly)            
             tmp.append(megatmp)
