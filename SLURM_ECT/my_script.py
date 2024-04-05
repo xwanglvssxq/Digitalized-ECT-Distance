@@ -14,4 +14,4 @@ with open('ECT.csv', newline='') as csvfile:
 meshid,mesh_name=params[array_id]
 infile=os.path.join('teeth',mesh_name)
 outfile=os.path.join('outputs',meshid+'.npy')
-ECT=ect_slurm_tools.compute_ECT(infile, outfile)
+ect_slurm_tools.compute_ECT(infile, outfile)

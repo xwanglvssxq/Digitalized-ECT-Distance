@@ -1,6 +1,7 @@
 # Remember to check:
 # 1. pts on spherical polygon should be normalied at least and only once (done in orientation)
 # 2. polygons in ECT should be in correct orientation (done in orientation)
+# 3. meshes should be supported in a unit ball
 
 from scipy.stats import special_ortho_group
 import numpy as np
@@ -14,17 +15,21 @@ tol = 0.000001
 
 def detect_rot(P, pi):
     # Here p1, p2, p3, pi are the Cartesian coordinates
+    # P sperical polygon
+    # pi not necessarily on sphere
     N = len(P)
 
     # Detect poles
     for i in range(N):
         if np.abs(P[i][2]) > 1-tol: return False
-    if np.abs(pi[2]) > 1-tol: return False
+    
+    if pi[0] == 0 and pi[1] == 0: return False
 
-    # Detect phi=0 arc, i.e.
+    # Detect phi=0 arc
     for i in range(N):
-        if P[i][0] > 0 and np.abs(P[i][1]) == 0: return False
-    if pi[0] > 0 and np.abs(pi[1]) == 0: return False
+        if P[i][0] > 0 and P[i][1] == 0: return False
+    
+    if pi[0] > 0 and pi[1] == 0: return False
 
     # Detect meridian
     for i in range(N):
@@ -99,11 +104,14 @@ def int_arc(phi_1, tau_1, phi_2, tau_2, phi_i, tau_i):
     return integral
 
 def int_polygon(P, pi):
+    # Apr. 5: pi is in the unit ball,
+    # not necessarily on the unit sphere
     I = 0
     N = len(P)
     P, pi = roted_sphere(P, pi)
+    r = fast_norm(pi)
     
-    phi_i, tau_i = cartesian_to_spherical(pi[0], pi[1], pi[2])
+    phi_i, tau_i = cartesian_to_spherical(pi[0]/r, pi[1]/r, pi[2]/r)
     phis = []
     taus = []
     
@@ -114,6 +122,8 @@ def int_polygon(P, pi):
     
     for i in range(N):
         I += int_arc(phis[i], taus[i], phis[(i+1)%N], taus[(i+1)%N], phi_i, tau_i)
+    
+    I = r * I
 
     return I
 
@@ -218,7 +228,6 @@ def polygon_area(P):
 def pt_in_sphpoly(pt, P):
     #ECT is orientized in orientation(return_ECT)
     N = len(P)
-    n0 = fast_cross(P[0], P[1])
 
     for i in range(N):
         n = fast_cross(P[i], P[(i+1)%N])
@@ -250,7 +259,6 @@ def necessary_nointersect(P1, P2):
     #GOOD(maybe BEST) necessary condition for no intersection
     #ECT is orientized in orientation(return_ECT)
     N1 = len(P1)
-    n0 = fast_cross(P1[0], P1[1])
 
     for i in range(N1):
         n = fast_cross(P1[i], P1[(i+1)%N1])
@@ -349,11 +357,7 @@ def arc_cir(p1, p2, pk, pl):
         elif pt_in_arc(-v, p1, p2): 
             p_int = -v
         else: 
-            print('error in arc_cir: ',arc_diff(v, p1, p2), arc_diff(-v, p1, p2))
-            if arc_diff(v, p1, p2) < arc_diff(-v, p1, p2):
-                p_int = v
-            else:
-                p_int = -v
+            print('error in arc_cir: ')
 
         return p_int
 
@@ -541,12 +545,15 @@ def com_ECT(degrees = 0, v = [0,0,1], file1 = 'octahedron.off', file2 = 'octahed
     s2=ShapeReader.shape_from_file(file2)
     #s2=ShapeReader.shape_from_file('small_teeth.off')
     
-    #do we need this???
+    #we need this
     #############################################################
-    for i in range(s1.V.shape[0]):
-        s1.V[i,:] = s1.V[i,:]/(np.sum(s1.V[i,:]**2)**(0.5))
+    s1.V = s1.V-np.mean(s1.V,0)
+    scales = [sum(tmp**2)**(0.5) for tmp in s1.V]
+    s1.V = s1.V/max(scales)
+    s2.V = s2.V-np.mean(s2.V,0)
+    scales2 = [sum(tmp**2)**(0.5) for tmp in s2.V]
+    s2.V = s2.V/max(scales2)
     for i in range(s2.V.shape[0]):
-        s2.V[i,:] = s2.V[i,:]/(np.sum(s2.V[i,:]**2)**(0.5))
         s2.V[i,:] = rotate_axis(s2.V[i,:], v, degrees)
     ############################################################# 
     

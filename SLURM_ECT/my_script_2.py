@@ -1,6 +1,6 @@
 import sys
 import csv
-import ect_slurm_tools.py
+import ect_slurm_tools
 import numpy as np
 import os
 # Read in the $SLURM_ARRAY_TASK_ID (Note python indexes start from 0, the arrays were from 1
@@ -12,12 +12,14 @@ with open('CSV_combos.csv', newline='') as csvfile:
     
 #Extract the values for A,B,C corresponding to the $SLURM_ARRAY_TASK_ID 
 id1,id2=params[array_id]
-ECT1=np.load(os.path.join('outputs',id1+'.npy'))
-ECT2=np.load(os.path.join('outputs',id2+'.npy'))
+ECT1=np.load(os.path.join('outputs',id1+'.npy'), allow_pickle=True)
+ECT2=np.load(os.path.join('outputs',id2+'.npy'), allow_pickle=True)
 
 path1=os.path.join('results',str(id1))
 path2=os.path.join('results',str(id2))
 
+#not good in distributed computation
+#have created folders instead
 if(not(os.path.exists(path1))):
     os.mkdir(path1)
     tmpfilename=os.path.join(path1,str(id1)+'.npy')
