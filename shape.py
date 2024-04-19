@@ -37,6 +37,8 @@ class Shape:
         self.polygons={}
         self.clean_polygon_gains={}
         self.clean_polygons={}
+        self.edges=np.zeros([0,2])
+        self.triangles=np.zeros([0,3])
     def center_n_scale(self):
         '''
         Not needed for now
@@ -232,6 +234,30 @@ class Shape:
         r2=[set1,set2,set3,set4]    
         return(r1,r2)
 
+
+    def prepare_for_MC(self):
+        '''
+        A helper function for doing MC Euler curves.
+        Non-digital function
+        '''
+        tmp=np.zeros([0,2])
+        for key in self.vertex_edges:
+            array=self.vertex_edges[key]
+            tmp=np.concatenate([tmp,array])
+        edges=np.unique(tmp,axis=0)
+        self.edges=edges.astype(int)
+        self.triangles=self.T.astype(int)
+        
+    def compute_MC_ECT(self,direction,threshold):
+        ''''
+        Evaluates the ECT at a given direction and height
+        Non-digital function
+        '''
+        heights=np.matmul(direction,self.V.T)
+        eheights=np.max(heights[self.edges],1)
+        theights=np.max(heights[self.triangles],1)
+        summa=sum(heights<=threshold)-sum(eheights<=threshold)+sum(theights<=threshold)
+        return(summa)
 
     def compute_polygon_vol3(self,key):
         '''
@@ -584,6 +610,7 @@ class Shape:
                 gains[i]=self.evaluate_local_ECT(direction, key)           
             self.polygon_gains[key]=gains
         return(True)
+
 
     def evaluate_local_ECT(self,direction, vertex):
         '''
