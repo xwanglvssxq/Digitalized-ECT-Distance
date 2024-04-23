@@ -180,11 +180,11 @@ def arc_arc(p11, p12, p21, p22):
     p2 = fast_cross(p21, p22)
 
     #VERY GOOD necessary condition of no intersection
-    if fast_dot(p1, p21) * fast_dot(p1, p22) > 0 or fast_dot(p2, p11) * fast_dot(p2, p12) > 0:
+    if fast_dot(p1, p21) * fast_dot(p1, p22) > tol or fast_dot(p2, p11) * fast_dot(p2, p12) > tol:
         return None
     v = fast_cross(p1, p2)
     nv = fast_norm(v)
-    if nv == 0: return None
+    if nv < tol: return None
     v = v/nv
     # exclude the antipodal point
     # if data points aren't precise enough, problem may arise in the following 'if'
@@ -498,6 +498,7 @@ def ECT_distance_partial(ECT1, ECT2):
                 integral_s += polygon_area(P_divj)
                     
             integral += ECT1[idx1][0] * ECT2[idx2][0] * (integral_s - integral_i - integral_j)
+            #print(idx1,idx2,ECT1[idx1][0] * ECT2[idx2][0] * (integral_s - integral_i - integral_j),integral)
 
     return integral
 
