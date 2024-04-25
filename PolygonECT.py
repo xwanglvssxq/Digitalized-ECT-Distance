@@ -27,13 +27,13 @@ def detect_rot(P, pi):
 
     # Detect phi=0 arc
     for i in range(N):
-        if P[i][0] > 0 and P[i][1] == 0: return False
+        if P[i][0] > 0 and np.abs(P[i][1]) < tol: return False
     
-    if pi[0] > 0 and pi[1] == 0: return False
+    if pi[0] > 0 and np.abs(pi[1]) < tol: return False
 
     # Detect meridian
     for i in range(N):
-        if np.abs(P[i][0] * P[(i+1)%N][1] - P[(i+1)%N][0] * P[i][1]) <= tol: return False
+        if np.abs(np.abs(P[i][0]/P[i][1])-np.abs(P[(i+1)%N][0]/P[(i+1)%N][1])) < tol: return False
 
     # Detect equator
     for i in range(N):
