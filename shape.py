@@ -39,6 +39,7 @@ class Shape:
         self.clean_polygons={}
         self.edges=np.zeros([0,2])
         self.triangles=np.zeros([0,3])
+        self.bad_vertices=list()
     def center_n_scale(self):
         '''
         Not needed for now
@@ -129,6 +130,59 @@ class Shape:
         self.polygon_midpoints[key]=midpoints
 
 
+    def delete_vertex(self,badindex):
+        '''
+        To delete annoying triangles
+        Use only after prepare and compute_links
+        '''
+        tmpL=self.V[:badindex,]
+        tmpU=self.V[(badindex+1):,:]
+        tmpV=np.concatenate([tmpL,tmpU])
+        self.V=tmpV
+        for i in range(len(self.T)):
+            triangle=self.T[i]
+            if(triangle[0])>badindex:
+                triangle[0]=triangle[0]-1
+            if(triangle[1])>badindex:
+                triangle[1]=triangle[1]-1
+            if(triangle[2])>badindex:
+                triangle[2]=triangle[2]-1
+        self.T[i]=triangle
+        self.vertex_faces={}#[i]=faces
+        self.vertex_edges={}#[i]=edges
+        self.links={}
+        self.prepare()
+        self.compute_links()
+        
+        
+    def clean_isolated_triangles(self):
+        '''
+        Destroys annoying triangles
+        '''
+        do_something=0
+        for key in self.vertex_faces:
+            #print(key)
+            if len(self.vertex_faces[key])==1:
+                do_something=1
+        while(do_something):
+            do_something=0
+            for key in self.vertex_faces:
+                try:
+                    self.vertex_faces[key]
+                except:
+                    break
+                if len(self.vertex_faces[key])==1:
+                    print(key)
+                    self.delete_vertex(key)
+            for key in self.vertex_faces:
+                try:
+                    self.vertex_faces[key]
+                except:
+                    break
+                if len(self.vertex_faces[key])==1:
+                    print(key)
+                    do_something=1
+        
     def compute_delaunay_triangles2(self):
         '''
         The third step. Finds the Delaunay triangulation of the 
