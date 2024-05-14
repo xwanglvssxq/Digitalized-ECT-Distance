@@ -9,7 +9,7 @@ array_id=int(sys.argv[1])
 # Read in the CSV
 with open('CSV_combos.csv', newline='') as csvfile:
     params = list(csv.reader(csvfile, delimiter=',', quotechar='|'))
-    
+
 #Extract the values for A,B,C corresponding to the $SLURM_ARRAY_TASK_ID 
 id1,id2=params[array_id]
 ECT1=np.load(os.path.join('outputs',id1+'.npy'), allow_pickle=True)
@@ -31,7 +31,10 @@ if(not(os.path.exists(path2))):
     tmp=np.array([0])
     np.save(tmpfilename,tmp)
 
-d=ect_slurm_tools.compute_ECT_distance_p(ECT1, ECT2)
+if id1 == id2:
+    d=ect_slurm_tools.compute_ECT_distance_s(ECT1)
+else:
+    d=ect_slurm_tools.compute_ECT_distance_d(ECT1, ECT2)
 crosspath1=os.path.join(path2,str(id1)+'.npy')
 crosspath2=os.path.join(path1,str(id2)+'.npy')
 np.save(crosspath1,d)

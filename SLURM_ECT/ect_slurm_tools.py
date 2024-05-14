@@ -16,7 +16,12 @@ def compute_ECT(infile,outfile):
     ECT = np.array(ECT, dtype=object)
     np.save(outfile, ECT)
 
-def compute_ECT_distance_p(ECT1, ECT2):
+def compute_ECT_distance_s(ECT):
     #receive digitalized ECT, output dECT_p12, dECT12 = dECT_p11 + dECT_p22 -2*dECT_p12
-    dECT_partial=ect.ECT_distance_partial(ECT1, ECT2)
-    return dECT_partial
+    dECT_s=ect.ECT_distance_s(ECT)
+    return dECT_s
+
+def compute_ECT_distance_d(ECT1, ECT2):
+    #receive digitalized ECT, output dECT_p12, dECT12 = dECT_p11 + dECT_p22 -2*dECT_p12
+    dECT_d=ect.ECT_distance_d(ECT1, ECT2)
+    return dECT_d

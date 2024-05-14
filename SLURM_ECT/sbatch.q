@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --array=1-116%10
+#SBATCH --array=1-116%25
 #SBATCH --nodes=1
 #SBATCH --mem=10G
 #SBATCH --ntasks=1
